@@ -30,6 +30,45 @@ def print_fasta(reads, filename):
     oh.close()
 
 
+def filter_reads(filename):
+    '''Use seqtk and Biopython to trim and filter low quality reads'''
+
+    # run seqtk trimfq to trim low quality ends
+    optlog.info('Trimming reads with seqtk')
+    if filename.endswith('gz'):
+        optlog.info('Reads in gzip format')
+        r1 = 'gunzip -c %s | seqtk trimfq - ' % filename
+    else:
+        r1 = 'seqtk trimfq %s' % filename
+
+    c = 1
+    sequence_bag = set([])
+    oh = open('selected.fastq', 'w')
+    cnt = Counter()
+    proc = subprocess.Popen(r1, shell=True, stdout=subprocess.PIPE,
+                            universal_newlines=True)
+    optlog.info('Filtering')
+    with proc.stdout as handle:
+        for s in SeqIO.parse(handle, 'fastq'):
+            quals = s.letter_annotations['phred_quality']
+            rl = len(s)
+            seq = str(s.seq)
+            if 'N' in seq or \
+                float(sum(quals)) / rl < qual_thresh or \
+                rl < min_len:
+                continue
+            if seq in sequence_bag:
+                SeqIO.write(s, oh, 'fastq')
+                c += 1
+                cnt.update([seq])
+                if c % 50000 == 0:
+                    print >> sys.stderr, 'Written %10d reads' % c
+            else:
+                sequence_bag.add(seq)
+    oh.close()
+    return cnt
+
+
 def compute_msa(ref):
     '''Takes contigs in velvet output directory, checks the orientation and
     computes MSA
@@ -114,40 +153,8 @@ def main(filename, reference, length):
     optlog.addHandler(hl)
     optlog.info(' '.join(sys.argv))
 
-    # run seqtk trimfq to trim low quality ends
-    optlog.info('Trimming reads with seqtk')
-    if filename.endswith('gz'):
-        optlog.info('Reads in gzip format')
-        r1 = 'gunzip -c %s | seqtk trimfq - ' % filename
-    else:
-        r1 = 'seqtk trimfq %s' % filename
-
     # if average quality is low, or Ns are present, or read is short discard
-    mean_len = 1
-    c = 1
-    sequence_bag = set([])
-    oh = open('selected.fastq', 'w')
-    cnt = Counter()
-    proc = subprocess.Popen(r1, shell=True, stdout=subprocess.PIPE)
-    optlog.info('Filtering')
-    with proc.stdout as handle:
-        for s in SeqIO.parse(handle, 'fastq'):
-            quals = s.letter_annotations['phred_quality']
-            rl = len(s)
-            seq = str(s.seq)
-            if 'N' in seq or \
-                float(sum(quals)) / rl < qual_thresh or \
-                rl < min_len:
-                continue
-            if seq in sequence_bag:
-                SeqIO.write(s, oh, 'fastq')
-                c += 1
-                cnt.update([seq])
-                if c % 50000 == 0:
-                    print >> sys.stderr, 'Written %10d reads' % c
-            else:
-                sequence_bag.add(seq)
-    oh.close()
+    cnt = filter_reads(filename)
 
     optlog.info('There are %d unique reads' % len(cnt))
 
