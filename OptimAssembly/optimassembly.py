@@ -62,7 +62,7 @@ def filter_reads(filename):
                 c += 1
                 cnt.update([seq])
                 if c % 50000 == 0:
-                    print >> sys.stderr, 'Written %10d reads' % c
+                    print('Written %10d reads' % c, file=sys.stderr)
             else:
                 sequence_bag.add(seq)
     oh.close()
@@ -73,27 +73,34 @@ def compute_msa(ref):
     '''Takes contigs in velvet output directory, checks the orientation and
     computes MSA
     '''
+    from Bio.SeqRecord import SeqRecord
+    from Bio.Seq import Seq
+
     save_contigs = []
     for rep in range(1, replicates + 1):
         contigs_file = 'out_%d/contigs.fa' % rep
         contigs = [s for s in SeqIO.parse(contigs_file, 'fasta')]
         optlog.info('In replicate %d found %d contigs' % (rep, len(contigs)))
         for cont in contigs:
+            optlog.debug(cont.id)
             # forward
             exe_string = 'needle %s asis:%s -auto -out stdout | grep Score | cut -d \" \" -f 3' % \
                 (ref, cont.seq)
-            score = subprocess.check_output(exe_string, shell=True)
+            score = subprocess.check_output(exe_string, shell=True,
+                                            universal_newlines=True)
             score_forward = float(score)
             # reverse
             exe_string = 'needle %s asis:%s -sreverse2 -auto -out stdout | grep Score | cut -d \" \" -f 3' % \
                 (ref, cont.seq)
-            score = subprocess.check_output(exe_string, shell=True)
+            score = subprocess.check_output(exe_string, shell=True,
+                                            universal_newlines=True)
             score_reverse = float(score)
 
             if score_forward >= score_reverse:
                 save_contigs.append(cont)
             else:
-                save_contigs.append(cont.reverse_complement())
+                save_contigs.append(SeqRecord(id=cont.id,
+                                              seq=cont.seq.reverse_complement()))
 
     allc = SeqIO.write(save_contigs, 'all_contigs.fasta', 'fasta')
     optlog.info('All %d contigs written to all_contigs.fasta' % allc)
@@ -110,7 +117,7 @@ def compute_msa(ref):
     optlog.info('Trying to get consensus')
     exe_string = 'cons msa.fasta -outseq consensus.fasta -plurality 0.0001 -auto \
     -name consensus_contigs'
-    msa = subprocess.call(exe_string, shell=True)
+    msa = subprocess.call(exe_string, shell=True, universal_newlines=True)
     if msa > 1:
         optlog.error('Error %d returned trying cons' % msa)
         return
@@ -122,7 +129,7 @@ def compute_msa(ref):
         exe_string = 'needle %s consensus.fasta  -auto -aformat3 sam -stdout | grep -v ^@ | cut -f 6' % ref
         cigar = subprocess.check_output(exe_string, shell=True)
         optlog.info('Alignment run, cigar string is %s' % cigar)
-        print >> sys.stderr, 'Reference vs. consensus cigar: %s' % cigar
+        print('Reference vs. consensus cigar: %s' % cigar, file=sys.stderr)
     except CalledProcessError:
         optlog.error('Could not run the alignment')
 
@@ -137,7 +144,7 @@ def run_velvet(fastafile, dir_n, contig_cut):
     subprocess.call(exe_string, shell=True)
 
 
-def main(filename, reference, length):
+def main(filename, reference, length, min_mult):
     '''
     '''
 
@@ -158,13 +165,14 @@ def main(filename, reference, length):
 
     optlog.info('There are %d unique reads' % len(cnt))
 
-    non_singletons = [p[0] for p in cnt.items() if p[1] != 1]
-    optlog.info(' %d are not singletons' % len(non_singletons))
+    non_singletons = [p[0] for p in list(cnt.items()) if p[1] > min_mult]
+    optlog.info('%d reads are present more than %d times each' % \
+                (len(non_singletons), min_mult))
     # integer division used in mean length
     mean_len = sum((len(st) for st in non_singletons))
     mean_len /= len(non_singletons)
     optlog.info('%d is their mean length' % mean_len)
-    out_n_reads = length * exp_cov / mean_len
+    out_n_reads = int(length * exp_cov / mean_len)
     optlog.info('%d needed for the desired coverage %d' %
                 (out_n_reads, exp_cov))
 
@@ -174,12 +182,12 @@ def main(filename, reference, length):
             rep_reads = random.sample(non_singletons, out_n_reads)
             fname = 'replicate_%d.fasta' % (r + 1)
             print_fasta(rep_reads, fname)
-            run_velvet(fname, r + 1, mean_len)
+            run_velvet(fname, r + 1, int(length / 3))
         except ValueError:
             optlog.info('Taking all reads')
             fname = 'non_singleton_reads.fasta'
             print_fasta(non_singletons, fname)
-            run_velvet(fname, r, mean_len)
+            run_velvet(fname, r, int(length / 3))
             break
 
     # only if reference is given and replicates are present
@@ -200,6 +208,10 @@ if __name__ == "__main__":
                         help='closest known genome reference')
     parser.add_argument('-l', '--length', dest='exp_length', type=int,
                         default=10000, help='expected length <%(default)s>')
+    parser.add_argument('-m', '--multi', dest='min_multi', type=int,
+                        default=1,
+                        help='minimal multiplicity of reads not to be \
+                              considered singletons <%(default)s>')
 
     args = parser.parse_args()
     main(filename=args.fastq, reference=args.reference, length=args.exp_length)
