@@ -16,7 +16,7 @@ mylog = logging.getLogger(__name__)
 
 dn = os.path.dirname(__file__)
 
-references_file = os.path.expanduser('~/Projects/MinVar/HapInf/data/HIV1_CON_2004_pol_DNA.fasta')
+references_file = os.path.expanduser('HIV_consensus.fasta')
 
 qual_thresh = 20
 min_len = 75
