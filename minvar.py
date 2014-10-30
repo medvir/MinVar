@@ -5,22 +5,25 @@ import os.path
 import sys
 import subprocess
 import shutil
+import warnings
 
 from Bio import SeqIO
+
+import callvar
+from OptimAssembly import optimassembly
+from ReportDRM.src import reportdrm
 
 import logging
 import logging.handlers
 
 # Make a global logging object.
 mylog = logging.getLogger(__name__)
-
 dn = os.path.dirname(__file__)
 
-references_file = os.path.expanduser('HIV_consensus.fasta')
-
+references_file = os.path.join(dn, 'db/HIV_consensus.fasta')
+def_amp = os.path.join(dn, 'db/HXB2_pol_gene.fasta')
 qual_thresh = 20
 min_len = 75
-from OptimAssembly import optimassembly
 
 def filter_reads(filename):
     '''Use seqtk and Biopython to trim and filter low quality reads'''
@@ -28,7 +31,7 @@ def filter_reads(filename):
     # run seqtk trimfq to trim low quality ends
     mylog.info('Trimming reads with seqtk')
     if filename.endswith('gz'):
-        optlog.info('Reads in gzip format')
+        mylog.info('Reads in gzip format')
         r1 = 'gunzip -c %s | seqtk trimfq - ' % filename
     else:
         r1 = 'seqtk trimfq %s' % filename
@@ -70,9 +73,19 @@ def find_subtype():
     hits.sort(['score', 'pident', 'length', 'qcovs'], ascending=False,
               inplace=True)
     best_hit = hits.iloc[0]
-    if best_hit.pident < 98. or best_hit.qcovs < 95. or \
-        best_hit.length < 100:
-        sys.exit('Good hit not found: run remotely!')
+
+    alarm = 0
+    if best_hit.pident < 97.:
+        warnings.warn('Low identity (%5.3f)' % best_hit.pident)
+        alarm += 1
+    if best_hit.qcovs < 95.:
+        warnings.warn('Low coverage (%5.3f)' % best_hit.qcovs)
+        alarm += 1
+    if best_hit.length < 100:
+        warnings.warn('Short match (%d)' % best_hit.length)
+        alarm += 1
+    if alarm > 1:
+        sys.exit('Too many warnings: consider run remotely.')
     # TODO: write the alternative to run remotely
     return best_hit.name
 
@@ -81,9 +94,9 @@ def align_reads(ref=None, reads=None):
     '''Align all high quality reads to found reference with smalt,
     convert and sort with samtools'''
 
-    cml = 'smalt index -k 7 -s 2 consref %s' % ref
+    cml = 'smalt index -k 7 -s 2 ref %s' % ref
     subprocess.call(cml, shell=True)
-    cml = 'smalt map -n 12 -o hq_2_cons.sam -x -c 0.8 -y 0.8 consref %s' % reads
+    cml = 'smalt map -n 12 -o hq_2_cons.sam -x -c 0.8 -y 0.8 ref %s' % reads
     subprocess.call(cml, shell=True)
     cml = 'samtools view -Su hq_2_cons.sam | samtools sort - hq_2_cons_sorted'
     subprocess.call(cml, shell=True)
@@ -91,6 +104,7 @@ def align_reads(ref=None, reads=None):
     subprocess.call(cml, shell=True)
 
     os.remove('hq_2_cons.sam')
+    return 'hq_2_cons_sorted.bam'
 
 
 def parse_com_line():
@@ -110,7 +124,7 @@ def parse_com_line():
     group3 = parser.add_argument_group('More options',
                                        'Do you really want to change this?')
 
-    group1.add_argument("-a", "--amplicon", default='', type=str, dest="a",
+    group1.add_argument("-a", "--amplicon", default=def_amp, type=str, dest="a",
                         help="fasta file with the amplicon")
 
     group1.add_argument("-f", "--fastq", default="", type=str, dest="f",
@@ -142,21 +156,37 @@ def parse_com_line():
     return parser.parse_args()
 
 
-if __name__ == "__main__":
-
+def main(read_file=None, amp_file=None):
     import subprocess
 
-    args = parse_com_line()
+    if not read_file:
+        args = parse_com_line()
+        read_file = args.f
+    if not amp_file:
+        amp_file = def_amp
 
-    assert os.path.exists(args.f), 'File %s not found' % args.f
+    assert os.path.exists(read_file), 'File %s not found' % read_file
     # locally defined filter_reads writes reads into high_quality.fastq
-    #filter_reads(args.f)
-    ref = list(SeqIO.parse(args.a, 'fasta'))[0]
-#    optimassembly.main('high_quality.fastq', args.a, len(ref), 2)
-    # find subtype and use it for alignment 
-    match_id = find_subtype()
-    al_ref = 'matching_reference.fasta'
-    cml = 'seqret %s:%s -outseq %s -auto' % (references_file, match_id, al_ref)
-    subprocess.call(cml, shell=True)
-    align_reads(ref=al_ref, reads='high_quality.fastq')
+    filter_reads(read_file)
+    ref = list(SeqIO.parse(amp_file, 'fasta'))[0]
+    mylog.info('Calling optimassembly')
+    optimassembly.main('high_quality.fastq', amp_file, len(ref), 2)
     
+    # find subtype: only used in the report
+    try:
+        match_id = find_subtype()
+        #al_ref = 'matching_reference.fasta'
+        #cml = 'seqret %s:%s -outseq %s -auto' % (references_file, match_id, al_ref)
+        #subprocess.call(cml, shell=True)
+    except:
+        match_id = ''
+
+    hxb2_ref = amp_file
+    # TODO hxb2ref should be inferred from the amplicon
+    al_reads = align_reads(ref=hxb2_ref, reads='high_quality.fastq')
+    mut_file = callvar.main(ref_file=amp_file, bamfile=al_reads)
+    reportdrm.main(mut_file, match_id)
+
+
+if __name__ == "__main__":
+    main()

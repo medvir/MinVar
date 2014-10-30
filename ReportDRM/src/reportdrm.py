@@ -74,6 +74,7 @@ def parse_mutations(haplos):
 
 def parse_region(hap1):
     '''Whether the region comes from protease, RT or integrase'''
+
     import Alignment
 
     # align to protease and RT joined
@@ -112,14 +113,13 @@ def parse_region(hap1):
         return None
 
 
-def write_header(handle):
+def write_header(handle, match_id=None):
     '''Write header to a file in markdown format'''
     md_header = 'Drug resistance mutations detected by NGS sequencing'
     mc = len(md_header)
     md_header += '\n' + '=' * len(md_header) + '\n\n'
-    if os.path.exists('matching_reference.fasta'):
-        match_ref = list(open('matching_reference.fasta'))[0][1:]
-    md_header += 'Subtype detected: {}'.format(match_ref)
+    if match_id:
+        md_header += 'Subtype detected: {}'.format(match_id)
     md_header += '''
 
 The list of mutations was downloaded from HIVdb and includes:
@@ -142,10 +142,14 @@ def parse_com_line():
     args = parser.parse_args()
     return args
 
-def main(hap_file):
+def main(hap_file, match_id=None):
     '''What does the main do?'''
     import subprocess
     import pickle
+
+    # Appending to path in order to find Alignment
+    sys.path.append(dn_dir)
+    
 
     rh = open('report.md', 'w')
     write_header(rh)

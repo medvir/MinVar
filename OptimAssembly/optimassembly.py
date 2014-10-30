@@ -15,7 +15,7 @@ optlog = logging.getLogger(__name__)
 
 replicates = 5
 qual_thresh = 30
-exp_cov = 100
+exp_cov = 200
 min_len = 75
 
 
@@ -135,7 +135,7 @@ def compute_msa(ref):
 
 
 def run_velvet(fastafile, dir_n, contig_cut):
-    exe_string = 'velveth out_%d 21 -short -fasta %s' % (dir_n, fastafile)
+    exe_string = 'velveth out_%d 25 -short -fasta %s' % (dir_n, fastafile)
     optlog.info('running' + exe_string)
     subprocess.call(exe_string, shell=True)
     exe_string = 'velvetg out_%d -unused_reads yes -cov_cutoff auto \
@@ -159,6 +159,10 @@ def main(filename, reference, length, min_mult):
     hl.setFormatter(f)
     optlog.addHandler(hl)
     optlog.info(' '.join(sys.argv))
+    optlog.info('filename: %s' % filename)
+    optlog.info('reference: %s' % reference)
+    optlog.info('length: %d' % length)
+    optlog.info('min_mult: %d' % min_mult)
 
     # if average quality is low, or Ns are present, or read is short discard
     cnt = filter_reads(filename)
@@ -182,17 +186,24 @@ def main(filename, reference, length, min_mult):
             rep_reads = random.sample(non_singletons, out_n_reads)
             fname = 'replicate_%d.fasta' % (r + 1)
             print_fasta(rep_reads, fname)
-            run_velvet(fname, r + 1, int(length / 3))
+            run_velvet(fname, r + 1, int(length / 4))
         except ValueError:
             optlog.info('Taking all reads')
             fname = 'non_singleton_reads.fasta'
             print_fasta(non_singletons, fname)
-            run_velvet(fname, r, int(length / 3))
+            run_velvet(fname, r, int(length / 4))
             break
 
-    # only if reference is given and replicates are present
-    if reference and r:
+    if reference and r:  # if reference is given and replicates are present
         compute_msa(reference)
+    else:  # if replicates were not found, take longest contig
+        max_len = 0
+        max_cont = []
+        for s in SeqIO.parse('out_0/contigs.fa', 'fasta'):
+            if len(s) > max_len:
+                max_len = len(s)
+                max_cont = [s]
+        SeqIO.write(max_cont, 'consensus.fasta', 'fasta')
 
 
 if __name__ == "__main__":
