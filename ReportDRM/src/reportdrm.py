@@ -76,41 +76,21 @@ def parse_region(hap1):
     '''Whether the region comes from protease, RT or integrase'''
 
     import Alignment
+    matched_res = []
 
-    # align to protease and RT joined
-    prot_RT = str(prot.seq) + str(RT.seq)
-    Alignment.needle_align('asis:%s' % hap1, 'asis:%s' % prot_RT, 'tmp.tmp')
-    ald = Alignment.alignfile2dict(['tmp.tmp'])
-    os.remove('tmp.tmp')
-    ali = ald['asis']['asis']
-    ali.summary()
-    #ali.print_info()
+    for gs in [prot, RT, integrase]:
+        alout = '%s.tmp' % gs.id
+        Alignment.needle_align('asis:%s' % hap1, 'asis:%s' % str(gs.seq),
+                               alout)
+        ald = Alignment.alignfile2dict([alout])
+        os.remove(alout)
+        ali = ald['asis']['asis']
+        ali.summary()
+        ratio1 = float(ali.ident) / (ali.ident + ali.mismatches)
+        if ratio1 > 0.75:
+            matched_res.append(gs.id)
 
-    # align to integrase
-    Alignment.needle_align('asis:%s' % hap1,
-                           'asis:%s' % str(integrase.seq), 'tmp2.tmp')
-    ald2 = Alignment.alignfile2dict(['tmp2.tmp'])
-    os.remove('tmp2.tmp')
-    ali2 = ald2['asis']['asis']
-    ali2.summary()
-    #ali2.print_info()
-
-    # decide which region based on identities/(ident + mismatches) ratio
-    ratio1 = float(ali.ident) / (ali.ident + ali.mismatches)
-    ratio2 = float(ali2.ident) / (ali2.ident + ali2.mismatches)
-    if ratio1 > 0.75 and ratio2 > 0.75:
-        return [prot, RT, integrase]
-    elif ratio1 > 0.75 and ratio2 <= 0.75:
-        if ali.stop <= 99:
-            return [prot]
-        elif ali.start <= 99 and ali.stop > 99:
-            return [prot, RT]
-        elif ali.start > 99:
-            return [RT]
-    elif ratio1 <= 0.75 and ratio2 > 0.75:
-        return [integrase]
-    elif ratio1 <= 0.75 and ratio2 <= 0.75:
-        return None
+    return matched_res
 
 
 def write_header(handle, match_id=None):
@@ -159,14 +139,15 @@ def main(hap_file, match_id=None):
         hap_file = args.haps
 
     haps = list(SeqIO.parse(hap_file, 'fasta'))
-    print('Searching genes for match.\n', file=rh)
+    print('Searching genes for match. This only reports genes covered at least \
+at 75 %.\nIndividual aminoacid calls might be present. \n', file=rh)
     matched_region = parse_region(str(haps[0].seq))
     if not matched_region:
         print('None found: mutations not in protease/RT/integrase.\n', file=rh)
         sys.exit('Haplotypes not in protease/RT/integrase')
-    mr_ids = [mr.id for mr in matched_region]
+
     for g in ['protease', 'RT', 'integrase']:
-        mt = 'yes' if g in mr_ids else 'no'
+        mt = 'yes' if g in matched_region else 'no'
         print('**%s: %s**  ' % (g, mt), file=rh)
     print ('', file=rh)
 
