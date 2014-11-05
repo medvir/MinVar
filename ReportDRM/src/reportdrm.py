@@ -1,6 +1,4 @@
 #!/usr/bin/env python3.4
-'''Doctext to add
-'''
 
 import sys
 import os
@@ -71,6 +69,11 @@ def parse_mutations(haplos):
                     dict_list.append(dict_here)
 
     df = df.append(dict_list)
+    # dropping wild type and haplotype. Included because an additional
+    # consistency test might be added, but they are not needed anymore
+    df.drop(['haplotype', 'wt'], 1, inplace=True)
+    df = df.groupby(['pos', 'mut', 'gene'], as_index=False).sum()
+
     return df
         
 
@@ -155,8 +158,9 @@ at 75 %.\nIndividual aminoacid calls might be present. \n', file=rh)
 
     stem = '.'.join(hap_file.split('.')[:-1])
     json_file = stem + '.json'
+    csv_file = stem + '.csv'
 
-    if not os.path.exists(json_file):
+    if not os.path.exists(csv_file):
         print('Aligning %s' % hap_file, file=sys.stderr)
 
         resistance_mutations = parse_drm()
@@ -164,12 +168,10 @@ at 75 %.\nIndividual aminoacid calls might be present. \n', file=rh)
 
         mpd = pd.merge(mutation_detected, resistance_mutations,
                        on=['gene', 'pos', 'mut'])
-        # drop haplotype and wild type
-        mpd = mpd.iloc[:, 2:]
-        mpd.to_json(path_or_buf=json_file)
+        mpd.to_csv(path_or_buf=csv_file)
     else:
-        print('JSON file', json_file, 'found', file=sys.stderr)
-        mpd = pd.read_json(json_file)
+        print('CSV file', csv_file, 'found', file=sys.stderr)
+        mpd = pd.read_csv(csv_file)
 
     for gene in ['protease', 'RT', 'integrase']:
         gene_muts = mpd[mpd.gene == gene]
