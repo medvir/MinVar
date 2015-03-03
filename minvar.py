@@ -10,7 +10,6 @@ import warnings
 from Bio import SeqIO
 
 import callvar
-from OptimAssembly import optimassembly
 from ReportDRM.src import reportdrm
 
 import logging
@@ -52,29 +51,47 @@ def filter_reads(filename):
     oh.close()
 
 
-def find_subtype():
+def find_subtype(sampled_reads=200, remote=False):
     ''''''
     import pandas as pd
 
-    blast_out_file = 'blast_cons_ref.tsv'
-    format_specs = ['qseqid', 'sseqid', 'score', 'pident', 'qcovs',
-                       'length', 'mismatch', 'gapopen', 'qstart', 'qend',
-                       'sstart', 'send']
-    blast_out = open(blast_out_file, 'w')
-    blast_out.write('\t'.join(format_specs) + '\n')
-    blast_cmline = 'blastn -task megablast -query consensus.fasta'
-    blast_cmline += ' -subject %s' % references_file
-    blast_cmline += ' -outfmt \'6 %s\'' % ' '.join(format_specs)
+    loc_hit_file = 'loc_res.tsv'
+    rem_hit_file = 'rem_res.tsv'
+    # columns defined in standard blast output format 6
+    cols = ['qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen',
+            'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore']
+
+    # sample reads with seqtk and convert to fasta
+    s_cmline = 'seqtk sample high_quality.fastq {} | seqret -filter -out \
+                sample_hq.fasta'.format(sampled_reads)
+    sout = subprocess.check_output(s_cmline, shell=True,
+                                   universal_newlines=True)
+
+    # prepare blast to subject sequences
+    blast_cmline_0 = 'blastn -task megablast -query sample_hq.fasta -outfmt 6'
+    blast_cmline = blast_cmline_0 + ' -subject {} -out {}'.format(references_file,
+                                                                  loc_hit_file)
     bout = subprocess.check_output(blast_cmline, shell=True,
                                    universal_newlines=True)
-    blast_out.write(bout)
-    blast_out.close()
-    hits = pd.read_csv(blast_out_file, index_col='sseqid', delimiter="\t")
-    hits.sort(['score', 'pident', 'length', 'qcovs'], ascending=False,
-              inplace=True)
-    best_hit = hits.iloc[0]
 
-    alarm = 0
+    # read blast results and assigns to best subjects
+    loc_hits = pd.read_csv(loc_hit_file, names=cols, delimiter="\t")
+    n_hits = loc_hits.shape[0]
+    queries = len(set(loc_hits['qseqid']))
+    print('Queries: {}\tHits: {}'.format(queries, n_hits))
+    freqs = {k: 0.0 for k in set(loc_hits['sseqid'])}
+
+    grouped = loc_hits.groupby(['qseqid'])
+    for name, group in grouped:
+        matching = group[group['pident'] == group['pident'].max()]['sseqid']
+        # if query has more max matching, shares the weight
+        for m in matching:
+            freqs[m] += 1./len(matching)
+
+    locfreqs = ((k, freqs[k]/queries) for k in sorted(freqs, key=freqs.get, reverse=True) if freqs[k])
+    return locfreqs
+
+    '''
     if best_hit.pident < 97.:
         warnings.warn('Low identity (%5.3f)' % best_hit.pident)
         alarm += 1
@@ -84,10 +101,21 @@ def find_subtype():
     if best_hit.length < 100:
         warnings.warn('Short match (%d)' % best_hit.length)
         alarm += 1
-    if alarm > 1:
-        sys.exit('Too many warnings: consider run remotely.')
-    # TODO: write the alternative to run remotely
-    return best_hit.name
+    '''
+    if remote > 1:
+        warnings.warn('Too many warnings: running remotely.')
+        blast_cmline = 'blastn -task megablast -query sample_hq.fasta -db nr'
+        blast_cmline += ' -remote -entrez_query \"hiv1[organism]\"'
+        blast_cmline += ' -outfmt 6 -out remote_results.tsv'
+        bout = subprocess.check_output(blast_cmline, shell=True,
+                                       universal_newlines=True)
+        cols = ['qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen',
+                'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore']
+        hits = pd.read_csv('remote_results.tsv', names=cols, delimiter="\t")
+        best_hit = hits.iloc[0]
+        return best_hit.sseqid
+        
+    return
 
 
 def align_reads(ref=None, reads=None):
@@ -159,25 +187,19 @@ def parse_com_line():
 def main(read_file=None, amp_file=None):
     import subprocess
 
+    args = parse_com_line()
+    amp_file = args.a
     if not read_file:
-        args = parse_com_line()
         read_file = args.f
-    if not amp_file:
-        amp_file = def_amp
 
     assert os.path.exists(read_file), 'File %s not found' % read_file
     # locally defined filter_reads writes reads into high_quality.fastq
     filter_reads(read_file)
     ref = list(SeqIO.parse(amp_file, 'fasta'))[0]
-    mylog.info('Calling optimassembly')
-    optimassembly.main('high_quality.fastq', amp_file, len(ref), 2)
     
     # find subtype: only used in the report
     try:
-        match_id = find_subtype()
-        #al_ref = 'matching_reference.fasta'
-        #cml = 'seqret %s:%s -outseq %s -auto' % (references_file, match_id, al_ref)
-        #subprocess.call(cml, shell=True)
+        matched_types = find_subtype()
     except:
         match_id = ''
 
@@ -185,7 +207,7 @@ def main(read_file=None, amp_file=None):
     # TODO hxb2ref should be inferred from the amplicon
     al_reads = align_reads(ref=hxb2_ref, reads='high_quality.fastq')
     mut_file = callvar.main(ref_file=amp_file, bamfile=al_reads)
-    reportdrm.main(mut_file, match_id)
+    reportdrm.main(mut_file, matched_types)
 
 
 if __name__ == "__main__":

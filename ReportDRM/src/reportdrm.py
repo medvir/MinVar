@@ -75,7 +75,7 @@ def parse_mutations(haplos):
     df = df.groupby(['pos', 'mut', 'gene'], as_index=False).sum()
 
     return df
-        
+
 
 def parse_region(hap1):
     '''Whether the region comes from protease, RT or integrase'''
@@ -98,14 +98,23 @@ def parse_region(hap1):
     return matched_res
 
 
-def write_header(handle, match_id=None):
+def write_header(handle, matched_types=None):
     '''Write header to a file in markdown format'''
     md_header = 'Drug resistance mutations detected by NGS sequencing'
     mc = len(md_header)
     md_header += '\n' + '=' * len(md_header) + '\n\n'
-    if match_id:
-        md_header += 'Subtype detected: {}'.format(match_id)
+    md_header +='Subtype inference with blast\n'
+    md_header +='----------------------------\n'
+    md_header += '|    subtype    | support [%] |\n'
+    md_header += '|:{:-^13}:|:{:-^11}:|\n'.format('', '', '')
+    if matched_types:
+        for mtype, freq in matched_types:
+            int_freq = int(round(100 * freq, 0))
+            md_header += '|{: ^15}|{: ^13}|\n'.format(mtype, int_freq)
     md_header += '''
+
+Parsing mutations
+-----------------
 
 The list of mutations was downloaded from HIVdb and includes:
 
@@ -127,7 +136,7 @@ def parse_com_line():
     args = parser.parse_args()
     return args
 
-def main(hap_file, match_id=None):
+def main(hap_file, matched_types=None):
     '''What does the main do?'''
     import subprocess
     import pickle
@@ -137,7 +146,7 @@ def main(hap_file, match_id=None):
     
 
     rh = open('report.md', 'w')
-    write_header(rh)
+    write_header(rh, matched_types)
 
     if not hap_file:
         args = parse_com_line()
@@ -145,7 +154,7 @@ def main(hap_file, match_id=None):
 
     haps = list(SeqIO.parse(hap_file, 'fasta'))
     print('Searching genes for match. This only reports genes covered at least \
-at 75 %.\nIndividual aminoacid calls might be present. \n', file=rh)
+at 75%.\nIndividual aminoacid calls might be present. \n', file=rh)
     matched_region = parse_region(str(haps[0].seq))
     if not matched_region:
         print('None found: mutations not in protease/RT/integrase.\n', file=rh)
@@ -176,6 +185,7 @@ at 75 %.\nIndividual aminoacid calls might be present. \n', file=rh)
     for gene in ['protease', 'RT', 'integrase']:
         gene_muts = mpd[mpd.gene == gene]
         if gene_muts.shape[0] == 0:
+            print('No mutations on ', gene, file=sys.stderr)
             continue
         grouped = gene_muts.groupby(['pos', 'mut'])
 
@@ -190,11 +200,12 @@ at 75 %.\nIndividual aminoacid calls might be present. \n', file=rh)
                                                      int_freq),
                   file=rh)
         print('\n', file=rh)
-
+    rh.close()
     # convert to PDF with pandoc
-    tmpl_file = os.path.abspath(os.path.join(dn_dir, os.pardir, 'src/template.tex'))
-    subprocess.call('pandoc --template={} report.md -o report.pdf'.format(tmpl_file),
-                    shell=True)
+    tmpl_file = os.path.abspath(os.path.join(dn_dir, 'template.tex'))
+    pand_cml = 'pandoc --template={} report.md -o report.pdf'.format(tmpl_file)
+    print(pand_cml, file=sys.stderr)
+    subprocess.call(pand_cml, shell=True)
 
 
 if __name__ == '__main__':

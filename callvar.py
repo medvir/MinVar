@@ -4,7 +4,6 @@ import sys
 import subprocess
 import os
 import warnings
-import pysam
 
 from Bio import SeqIO
 from Bio.Seq import Seq
@@ -130,12 +129,17 @@ def filter_variant(info_field):
     if int(infos['DP']) < RAW_DEPTH_THRESHOLD:
         return False
 
-    freqs = [float(f) for f in infos['AF'].split(',')]
-    # insert frequency of the reference at the beginning
-    f0 = 1.0 - sum(freqs)
-    freqs.insert(0, f0)
+    # Alternate allele observations
+    freqs = [float(f) for f in infos['AO'].split(',')]    
+    # insert observations of the reference allele at the beginning, normalise
+    freqs.insert(0, float(infos['RO']))
 
-    return freqs
+    # lost observations should be few
+    if abs(1. - sum(freqs) / int(infos['DP'])) > 0.05:
+        warnings.warn('Lost observations: DP=%s, RO+AO=%d' % (infos['DP'], sum(freqs)))
+
+    return [f / int(infos['DP']) for f in freqs]
+
 
 def parsevar(frame, nt_ref, aa_ref, vcf_file):
     ''''''
@@ -174,9 +178,11 @@ def parsevar(frame, nt_ref, aa_ref, vcf_file):
             try:
                 freqs = filter_variant(lsp[7])
             except:
-                for k, v in info_fields.items():
-                    print(k, v, file=sys.stderr)
-                sys.exit('Accepted info fields are printed above')
+#                for k, v in info_fields.items():
+#                    print(k, v, file=sys.stderr)
+                print(lsp)
+                print("Unexpected error:", sys.exc_info()[0])
+                sys.exit()
             if not freqs:
                 continue
             alt = lsp[4]
@@ -224,9 +230,12 @@ def main(ref_file='HXB2_pol_gene.fasta', bamfile='hq_2_cons_sorted.bam'):
 
     # call variants with freebayes
     bamstem = '.'.join(bamfile.split('.')[:-1])
-    cml = 'freebayes --min-alternate-total 5 --min-alternate-fraction 0.05 --ploidy 20'
-    cml += ' --fasta-reference %s' % ref_file
-    cml += ' %s > %s_fb.vcf' % (bamfile, bamstem)
+    # -C=--min-alternate-count, -F= --min-alternate-fraction
+    cml = 'freebayes -C 15 -F 0.025 --pooled-continuous'
+    cml += ' --fasta-reference %s %s | ' % (ref_file, bamfile)
+    cml += '/usr/local/freebayes/vcflib/bin/vcffilter -f'
+    cml += ' \"QUAL > 100 & SAF > 5 & SAR > 5 & RPR > 1 & RPL > 1\" '
+    cml += ' > %s_fb.vcf' % bamstem
     subprocess.call(cml, shell=True)
 
     filteredvars = parsevar(frame, nt_framed, aa_framed, '%s_fb.vcf' % bamstem) 
