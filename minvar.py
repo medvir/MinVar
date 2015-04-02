@@ -24,6 +24,7 @@ def_amp = os.path.join(dn, 'db/HXB2_pol_gene.fasta')
 qual_thresh = 20
 min_len = 75
 
+
 def filter_reads(filename):
     '''Use seqtk and Biopython to trim and filter low quality reads'''
 
@@ -144,30 +145,26 @@ def parse_com_line():
 
     # First define all option groups
     group1 = parser.add_argument_group('Input files', 'Required input')
-
+    '''
     group2 = parser.add_argument_group('Run options',
                                        'Parameters that can (maybe should) be \
                                         changed according to the needs')
 
     group3 = parser.add_argument_group('More options',
                                        'Do you really want to change this?')
-
+    '''
     group1.add_argument("-a", "--amplicon", default=def_amp, type=str, dest="a",
                         help="fasta file with the amplicon")
 
     group1.add_argument("-f", "--fastq", default="", type=str, dest="f",
                         help="input reads in fastq format")
-
-    group2.add_argument("-s", "--winshifts", default=3, type=int, dest="s",
+    
+    '''group2.add_argument("-s", "--winshifts", default=3, type=int, dest="s",
                         help="number of window shifts <%(default)s>")
-
-    group3.add_argument("-i", "--sigma", default=0.01, type=float, dest="i",
-                        help="value of sigma to use when calling\
-                        SNVs <%(default)s>")
 
     group2.add_argument("-r", "--region", default='', type=str, dest="r",
                         help="region in format 'chr:start-stop',\
-                        eg 'ch3:1000-3000'")
+                        eg 'ch3:1000-3000'")'''
 
     # set logging level
     mylog.setLevel(logging.DEBUG)
@@ -184,29 +181,72 @@ def parse_com_line():
     return parser.parse_args()
 
 
-def main(read_file=None, amp_file=None):
-    import subprocess
+def make_consensus(hxb2_ref):
+    '''Take high quality reads, align with blast to HXB2, make consensus'''
 
-    args = parse_com_line()
-    amp_file = args.a
+    # take 400 fasta reads
+    cml = 'seqtk seq -A high_quality.fastq | seqtk sample - 800 > hq_smp.fasta'
+    subprocess.call(cml, shell=True)
+
+    # blast them
+    cml = 'blastn -task blastn -subject %s -query hq_smp.fasta -outfmt 5 \
+            -out outblast.xml -word_size 7 -qcov_hsp_perc 80' % hxb2_ref
+    subprocess.call(cml, shell=True)
+
+    # convert to SAM -> BAM -> sort, index
+    b2s_exe = os.path.join(dn, 'blast2sam.py')
+    cml = b2s_exe
+    cml += ' outblast.xml > outblast.sam'
+    subprocess.call(cml, shell=True)
+
+    cml = 'samtools view -F 16 -u outblast.sam | samtools sort - outblast_sorted'
+    subprocess.call(cml, shell=True)
+
+    cml = 'samtools index outblast_sorted.bam'
+    subprocess.call(cml, shell=True)
+
+    # mpileup and consensus with bcftools consensus (v1.2 required)
+    cml = 'samtools mpileup -uf %s outblast_sorted.bam | bcftools call -mv -Oz -o calls.vcf.gz' % hxb2_ref
+    subprocess.call(cml, shell=True)
+
+    cml = 'tabix calls.vcf.gz'
+    subprocess.call(cml, shell=True)
+
+    cml = 'cat %s | bcftools consensus calls.vcf.gz > tmpcns.fasta' % hxb2_ref
+    subprocess.call(cml, shell=True)
+
+    # change sequence name to sample_cons, remove old file
+    cml = 'sed -e \'s/HXB2_pol/sample_cons/\' tmpcns.fasta > cns.fasta'
+    subprocess.call(cml, shell=True)    
+    os.remove('tmpcns.fasta')
+
+
+def main(read_file=None, amp_file=None):
+
+    try:
+        args = parse_com_line()
+        amp_file = args.a
+    except:
+        amp_file = def_amp
     if not read_file:
         read_file = args.f
-
     assert os.path.exists(read_file), 'File %s not found' % read_file
+
     # locally defined filter_reads writes reads into high_quality.fastq
     filter_reads(read_file)
-    ref = list(SeqIO.parse(amp_file, 'fasta'))[0]
-    
+
+    # consensus is saved into cns.fasta
+    make_consensus(amp_file)
+
     # find subtype: only used in the report
     try:
         matched_types = find_subtype()
     except:
         match_id = ''
 
-    hxb2_ref = amp_file
-    # TODO hxb2ref should be inferred from the amplicon
-    al_reads = align_reads(ref=hxb2_ref, reads='high_quality.fastq')
-    mut_file = callvar.main(ref_file=amp_file, bamfile=al_reads)
+    # align reads, call mutations and write the report
+    al_reads = align_reads(ref='cns.fasta', reads='high_quality.fastq')
+    mut_file = callvar.main(ref_file='cns.fasta', bamfile=al_reads)
     reportdrm.main(mut_file, matched_types)
 
 

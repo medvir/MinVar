@@ -3,77 +3,42 @@
 import sys
 import os
 import warnings
+from pprint import pprint
 
 import pandas as pd
 from Bio import SeqIO
+
+# aminoacid one-letter code
+aa_set = set('GPAVLIMCFYWHKRQNEDST')
 
 # amminoacid sequences from files in db directory
 dn_dir = os.path.dirname(__file__)
 db_dir = os.path.abspath(os.path.join(dn_dir, os.pardir, 'db'))
 prot = \
-    list(SeqIO.parse(os.path.join(db_dir, 'protease.fasta'), 'fasta'))[0]
-RT = list(SeqIO.parse(os.path.join(db_dir, 'RT.fasta'), 'fasta'))[0]
+    list(SeqIO.parse(os.path.join(db_dir, 'protease.faa'), 'fasta'))[0]
+RT = list(SeqIO.parse(os.path.join(db_dir, 'RT.faa'), 'fasta'))[0]
 integrase = \
-    list(SeqIO.parse(os.path.join(db_dir, 'integrase.fasta'), 'fasta'))[0]
+    list(SeqIO.parse(os.path.join(db_dir, 'integrase.faa'), 'fasta'))[0]
 
 def parse_drm():
     '''Parse drug resistance mutations listed in files db/*Variation.txt'''
 
 
-    df = pd.DataFrame(columns=['pos', 'mut', 'gene'])
-    for gene, drm_file_name in [('protease', 'PRVariation.txt'),
-                                ('RT', 'RTVariation.txt'),
-                                ('integrase', 'INVariation.txt')]:
+    df_list = []
+    for gene, drm_file_name in [('protease', 'masterComments_PI.txt'),
+                                ('RT', 'masterComments_RTI.txt'),
+                                ('integrase', 'masterComments_INI.txt')]:
         drm_file = os.path.join(db_dir, drm_file_name)
-        for l in open(drm_file):
-            if not l.startswith('#'):
-                pos, mut = l.strip().split('|')
-                for m in mut:
-                    df = df.append({'gene': gene, 'pos': int(pos), 'mut': m},
-                                   ignore_index=True)
-    return df
-
-
-def parse_mutations(haplos):
-    '''returns a list of mutations with frequencies'''
-    import Alignment
-
-    df = pd.DataFrame(columns=['haplotype', 'wt', 'pos', 'mut', 'freq', 'gene'])
-
-    freqs = []
-    dict_list = []
-    for h in haplos:
-        freq = float(h.description.split('=')[1])
-        for mreg in [prot, RT, integrase]:
-            Alignment.needle_align('asis:%s' % str(mreg.seq),
-                                   'asis:%s' % str(h.seq), 'h.tmp')
-            alhr = Alignment.alignfile2dict(['h.tmp'])
-
-            os.remove('h.tmp')
-            alih = alhr['asis']['asis']
-            alih.summary()
-            if 3 * alih.mismatches > alih.ident:
-                continue
-            wt, mut = alih.seq_a, alih.seq_b
-
-            i = 0
-            end_wt, end_mut = len(wt.rstrip('-')), len(mut.rstrip('-'))
-            end_pos = min(end_wt, end_mut)
-            for z in list(zip(wt, mut))[:end_pos]:
-                i += z[0] != '-'
-                if z[0] != z[1] and i:
-                    mutation = '%s%d%s' % (z[0], i, z[1])
-                    dict_here = {'haplotype': h.id, 'gene': mreg.id, 'wt': z[0],
-                                 'pos': i, 'mut': z[1], 'freq': freq}
-
-                    dict_list.append(dict_here)
-
-    df = df.append(dict_list)
-    # dropping wild type and haplotype. Included because an additional
-    # consistency test might be added, but they are not needed anymore
-    df.drop(['haplotype', 'wt'], 1, inplace=True)
-    df = df.groupby(['pos', 'mut', 'gene'], as_index=False).sum()
-
+        try:
+            d1 = pd.read_table(drm_file, header=0, names=['pos', 'mut', 'category',
+                               'commented', 'comment'])
+        except:  # integrase does not have commented column
+            d1 = pd.read_table(drm_file, header=0, names=['pos', 'mut', 'category',
+                               'comment'])
+        gs = pd.Series([gene] * len(d1))
+        d1['gene'] = gs
+        df_list.append(d1)
+    df = pd.concat(df_list)
     return df
 
 
@@ -118,9 +83,9 @@ Parsing mutations
 
 The list of mutations was downloaded from HIVdb and includes:
 
-- 68 positions on protease
-- 344 positions on RT
-- 134 positions on integrase.
+- xyz positions on protease
+- zyx positions on RT
+- abc positions on integrase.
 '''
     print(md_header, file=handle)
 
@@ -136,6 +101,31 @@ def parse_com_line():
     args = parser.parse_args()
     return args
 
+
+def aa_unpack(mut_string):
+    if not mut_string.startswith('NOT'):
+        return set(mut_string)
+    else:
+        return aa_set - set(mut_string.split()[1])
+
+
+def parse_merged(mer_file):
+    '''This is done by hand because it was too complicated to achieve
+    this functionality with panda alone'''
+    import csv
+    mdf = []
+    with open(mer_file) as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            row['freq'] = float(row['freq'])
+            row['pos'] = int(row['pos'])
+            if row['mut_x'] in aa_unpack(row['mut_y']):
+                mdf.append(row)
+            elif row['mut_x'] and row['mut_y'] == '':
+                row['category'] = 'unannotated'
+                mdf.append(row)
+    return pd.DataFrame(mdf)
+
 def main(hap_file, matched_types=None):
     '''What does the main do?'''
     import subprocess
@@ -143,7 +133,6 @@ def main(hap_file, matched_types=None):
 
     # Appending to path in order to find Alignment
     sys.path.append(dn_dir)
-    
 
     rh = open('report.md', 'w')
     write_header(rh, matched_types)
@@ -166,39 +155,56 @@ at 75%.\nIndividual aminoacid calls might be present. \n', file=rh)
     print ('', file=rh)
 
     stem = '.'.join(hap_file.split('.')[:-1])
-    json_file = stem + '.json'
-    csv_file = stem + '.csv'
+    csv_file = 'mutations.csv'
 
-    if not os.path.exists(csv_file):
-        print('Aligning %s' % hap_file, file=sys.stderr)
+    print('Parsing DRM from database', file=sys.stderr)
+    resistance_mutations = parse_drm()
+    print('Shape is: ', resistance_mutations.shape)
 
-        resistance_mutations = parse_drm()
-        mutation_detected = parse_mutations(haps)
+    print('Reading mutations from %s' % csv_file, file=sys.stderr)
+    mutation_detected = pd.read_csv(csv_file)
+    print('Shape is: ', mutation_detected.shape)
 
-        mpd = pd.merge(mutation_detected, resistance_mutations,
-                       on=['gene', 'pos', 'mut'])
-        mpd.to_csv(path_or_buf=csv_file)
-    else:
-        print('CSV file', csv_file, 'found', file=sys.stderr)
-        mpd = pd.read_csv(csv_file)
+    mpd = pd.merge(mutation_detected, resistance_mutations, how='left',
+                   on=['gene', 'pos'])
+    mpd.to_csv(path_or_buf='merged_muts.csv')
+    print('Shape of raw merged is: ', mpd.shape)
+
+    # too complicated with panda, do it by hand
+    drms = parse_merged('merged_muts.csv')
+    print('Shape of merged is: ', drms.shape)
+    os.remove('merged_muts.csv')
+
+    drms.drop(['', 'commented', 'mut_y'], axis=1, inplace=True)
+    drms.rename(columns={'mut_x': 'mut'}, inplace=True)
+
+    cols = ['gene', 'pos', 'mut', 'freq', 'category']
+    drms = drms[cols]
+    drms.sort(cols[:3], inplace=True)
+    drms.to_csv('annotated_mutations.csv', index=False)
 
     for gene in ['protease', 'RT', 'integrase']:
-        gene_muts = mpd[mpd.gene == gene]
+        gene_muts = drms[drms.gene == gene]
         if gene_muts.shape[0] == 0:
             print('No mutations on ', gene, file=sys.stderr)
             continue
-        grouped = gene_muts.groupby(['pos', 'mut'])
 
+        grouped = gene_muts.groupby(['pos', 'mut'])
         print('%s' % gene, file=rh)
         print('-'*len(gene), file=rh)
-        print('| position | mutation | frequency [%] |', file=rh)
-        print('|:{:-^8}:|:{:-^8}:|:{:-^13}:|'.format('', '', ''), file=rh)
+        print('| position | mutation | frequency [%] |      category      |',
+              file=rh)
+        print('|:{:-^8}:|:{:-^8}:|:{:-^13}:|:{:-^18}:|'.format('', '', '', ''),
+              file=rh)
         for name, group in grouped:
+            # same pos mut tuple must give same annotation, probably redundant
+            assert group['category'].nunique() == 1, group['category'].describe()
+            mut_cat = group['category'].unique()[0]
             int_freq = int(round(100 * group['freq'].sum(), 0))
-            print('|{: ^10}|{: ^10}|{: ^15}|'.format(int(name[0]),
+            print('|{: ^10}|{: ^10}|{: ^15}|{: ^20}|'.format(int(name[0]),
                                                      name[1],
-                                                     int_freq),
-                  file=rh)
+                                                     int_freq,
+                                                     mut_cat), file=rh)
         print('\n', file=rh)
     rh.close()
     # convert to PDF with pandoc
