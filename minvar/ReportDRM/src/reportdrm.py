@@ -113,18 +113,18 @@ def parse_merged(mer_file):
     '''This is done by hand because it was too complicated to achieve
     this functionality with panda alone'''
     import csv
-    mdf = []
     with open(mer_file) as csvfile:
         reader = csv.DictReader(csvfile)
+        mdf = pd.DataFrame(columns=reader.fieldnames)
         for row in reader:
             row['freq'] = float(row['freq'])
             row['pos'] = int(row['pos'])
             if row['mut_x'] in aa_unpack(row['mut_y']):
-                mdf.append(row)
+                mdf = mdf.append(row, ignore_index=True)
             elif row['mut_x'] and row['mut_y'] == '':
                 row['category'] = 'unannotated'
-                mdf.append(row)
-    return pd.DataFrame(mdf)
+                mdf = mdf.append(row, ignore_index=True)
+    return mdf
 
 def main(hap_file, matched_types=None):
     '''What does the main do?'''
@@ -154,7 +154,6 @@ at 75%.\nIndividual aminoacid calls might be present. \n', file=rh)
         print('**%s: %s**  ' % (g, mt), file=rh)
     print ('', file=rh)
 
-    stem = '.'.join(hap_file.split('.')[:-1])
     csv_file = 'mutations.csv'
 
     print('Parsing DRM from database', file=sys.stderr)
@@ -173,7 +172,7 @@ at 75%.\nIndividual aminoacid calls might be present. \n', file=rh)
     # too complicated with panda, do it by hand
     drms = parse_merged('merged_muts.csv')
     print('Shape of merged is: ', drms.shape)
-    os.remove('merged_muts.csv')
+    #os.remove('merged_muts.csv')
 
     drms.drop(['', 'commented', 'mut_y'], axis=1, inplace=True)
     drms.rename(columns={'mut_x': 'mut'}, inplace=True)
@@ -187,6 +186,9 @@ at 75%.\nIndividual aminoacid calls might be present. \n', file=rh)
         gene_muts = drms[drms.gene == gene]
         if gene_muts.shape[0] == 0:
             print('No mutations on ', gene, file=sys.stderr)
+            print('No mutations on %s' % gene, file=rh)
+            print('-' * (len(gene) + 16), file=rh)
+            print(file=rh)
             continue
 
         grouped = gene_muts.groupby(['pos', 'mut'])
