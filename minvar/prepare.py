@@ -12,8 +12,8 @@ from Bio import SeqIO
 
 dn = os.path.dirname(__file__)
 references_file = os.path.join(dn, 'db/HIV_cons_db')  # used to determine subtype
-hiv_ref_db = os.path.join(dn, 'ReportDRM/db/cons_B_db')  # used to determine consensus
-def_amp = os.path.join(dn, 'ReportDRM/db/consensus_B.fna')
+hiv_ref_db = os.path.join(dn, 'db/cons_B_db')  # used to determine consensus
+def_amp = os.path.join(dn, 'db/consensus_B.fna')
 qual_thresh = 20
 min_len = 75
 

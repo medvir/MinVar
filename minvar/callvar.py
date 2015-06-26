@@ -26,12 +26,12 @@ HAPLO_FREQ_THRESHOLD = 0.025
 MAPPING_QUALITY_THRESHOLD = 20
 
 # amminoacid sequences from files in db directory
-db_dir = os.path.abspath(os.path.join(dn_dir, 'ReportDRM/db'))
-prot = \
-    list(SeqIO.parse(os.path.join(db_dir, 'protease.faa'), 'fasta'))[0]
-RT = list(SeqIO.parse(os.path.join(db_dir, 'RT.faa'), 'fasta'))[0]
-integrase = \
-    list(SeqIO.parse(os.path.join(db_dir, 'integrase.faa'), 'fasta'))[0]
+db_dir = os.path.abspath(os.path.join(dn_dir, 'db'))
+# prot = \
+#     list(SeqIO.parse(os.path.join(db_dir, 'protease.faa'), 'fasta'))[0]
+# RT = list(SeqIO.parse(os.path.join(db_dir, 'RT.faa'), 'fasta'))[0]
+# integrase = \
+#     list(SeqIO.parse(os.path.join(db_dir, 'integrase.faa'), 'fasta'))[0]
 B_pol_nt = \
     list(SeqIO.parse(os.path.join(db_dir, 'consensus_B.fna'), 'fasta'))[0]
 B_pol_aa = \
