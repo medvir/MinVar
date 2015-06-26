@@ -87,7 +87,7 @@ def find_subtype(sampled_reads=1000, remote=False):
     oh = open('subtype_evidence.csv', 'w')
     for k in sorted(freqs, key=freqs.get, reverse=True):
         if freqs[k]:
-            print('%s\t%5.2f\n' % (k, freqs[k]/queries), file=oh)
+            print('%s,%5.4f' % (k, freqs[k]/queries), file=oh)
     oh.close()
     return
     #

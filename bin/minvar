@@ -51,5 +51,5 @@ if __name__ == "__main__" and __package__ is None:
 	from minvar import annotate
 	annotate.main(recal_file)
 
-	from minvar.ReportDRM.src import reportdrm
-#	reportdrm.main('mutants.fasta', matched_types=ma_ty)
+	from minvar import reportdrm
+	reportdrm.main()

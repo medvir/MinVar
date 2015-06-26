@@ -18,10 +18,7 @@ from Bio.Alphabet import generic_dna
 # manipulate path to import functions
 dn_dir = os.path.dirname(os.path.abspath(__file__))
 os.sys.path.insert(1, dn_dir)
-mod = __import__('ReportDRM')
-sys.modules["ReportDRM"] = mod
-
-from ReportDRM.src import Alignment
+import Alignment
 
 RAW_DEPTH_THRESHOLD = 50
 MIN_FRACTION = 0.025

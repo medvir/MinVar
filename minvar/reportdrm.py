@@ -2,6 +2,7 @@
 
 import sys
 import os
+import csv
 import warnings
 from pprint import pprint
 
@@ -13,16 +14,15 @@ aa_set = set('GPAVLIMCFYWHKRQNEDST')
 
 # amminoacid sequences from files in db directory
 dn_dir = os.path.dirname(__file__)
-db_dir = os.path.abspath(os.path.join(dn_dir, os.pardir, 'db'))
-prot = \
-    list(SeqIO.parse(os.path.join(db_dir, 'protease.faa'), 'fasta'))[0]
-RT = list(SeqIO.parse(os.path.join(db_dir, 'RT.faa'), 'fasta'))[0]
-integrase = \
-    list(SeqIO.parse(os.path.join(db_dir, 'integrase.faa'), 'fasta'))[0]
+db_dir = os.path.abspath(os.path.join(dn_dir, 'db'))
+# prot = \
+#     list(SeqIO.parse(os.path.join(db_dir, 'protease.faa'), 'fasta'))[0]
+# RT = list(SeqIO.parse(os.path.join(db_dir, 'RT.faa'), 'fasta'))[0]
+# integrase = \
+#     list(SeqIO.parse(os.path.join(db_dir, 'integrase.faa'), 'fasta'))[0]
 
 def parse_drm():
     '''Parse drug resistance mutations listed in files db/*Variation.txt'''
-
 
     df_list = []
     for gene, drm_file_name in [('protease', 'masterComments_PI.txt'),
@@ -41,41 +41,43 @@ def parse_drm():
     df = pd.concat(df_list)
     return df
 
+# def parse_region(hap1):
+#     '''Whether the region comes from protease, RT or integrase'''
+#
+#     import Alignment
+#     matched_res = []
+#
+#     for gs in [prot, RT, integrase]:
+#         alout = '%s.tmp' % gs.id
+#         Alignment.needle_align('asis:%s' % hap1, 'asis:%s' % str(gs.seq),
+#                                alout)
+#         ald = Alignment.alignfile2dict([alout])
+#         os.remove(alout)
+#         ali = ald['asis']['asis']
+#         ali.summary()
+#         ratio1 = float(ali.ident) / (ali.ident + ali.mismatches)
+#         if ratio1 > 0.75:
+#             matched_res.append(gs.id)
+#
+#     return matched_res
 
-def parse_region(hap1):
-    '''Whether the region comes from protease, RT or integrase'''
 
-    import Alignment
-    matched_res = []
-
-    for gs in [prot, RT, integrase]:
-        alout = '%s.tmp' % gs.id
-        Alignment.needle_align('asis:%s' % hap1, 'asis:%s' % str(gs.seq),
-                               alout)
-        ald = Alignment.alignfile2dict([alout])
-        os.remove(alout)
-        ali = ald['asis']['asis']
-        ali.summary()
-        ratio1 = float(ali.ident) / (ali.ident + ali.mismatches)
-        if ratio1 > 0.75:
-            matched_res.append(gs.id)
-
-    return matched_res
-
-
-def write_header(handle, matched_types=None):
+def write_header(handle, subtype_file=None):
     '''Write header to a file in markdown format'''
     md_header = 'Drug resistance mutations detected by NGS sequencing'
     mc = len(md_header)
     md_header += '\n' + '=' * len(md_header) + '\n\n'
     md_header +='Subtype inference with blast\n'
     md_header +='----------------------------\n'
-    md_header += '|    subtype    | support [%] |\n'
-    md_header += '|:{:-^13}:|:{:-^11}:|\n'.format('', '', '')
-    if matched_types:
-        for mtype, freq in matched_types:
-            int_freq = int(round(100 * freq, 0))
-            md_header += '|{: ^15}|{: ^13}|\n'.format(mtype, int_freq)
+    md_header += '|     subtype     | support [%] |\n'
+    md_header += '|:{:-^15}:|:{:-^11}:|\n'.format('', '', '')
+    if subtype_file:
+        with open(subtype_file) as csvfile:
+            spamreader = csv.reader(csvfile, delimiter=',')
+            for mtype, freq in spamreader:
+                int_freq = int(round(100 * float(freq), 0))
+                if int_freq >= 1:
+                    md_header += '|{: ^17}|{: ^13}|\n'.format(mtype, int_freq)
     md_header += '''
 
 Parsing mutations
@@ -112,7 +114,7 @@ def aa_unpack(mut_string):
 def parse_merged(mer_file):
     '''This is done by hand because it was too complicated to achieve
     this functionality with panda alone'''
-    import csv
+
     with open(mer_file) as csvfile:
         reader = csv.DictReader(csvfile)
         mdf = pd.DataFrame(columns=reader.fieldnames)
@@ -126,51 +128,31 @@ def parse_merged(mer_file):
                 mdf = mdf.append(row, ignore_index=True)
     return mdf
 
-def main(hap_file, matched_types=None):
+def main(mut_file='annotated_mutations.csv', subtypes_file='subtype_evidence.csv'):
     '''What does the main do?'''
-    import subprocess
-    import pickle
 
-    # Appending to path in order to find Alignment
-    sys.path.append(dn_dir)
+    import subprocess
 
     rh = open('report.md', 'w')
-    write_header(rh, matched_types)
+    write_header(rh, subtypes_file)
 
-    if not hap_file:
-        args = parse_com_line()
-        hap_file = args.haps
-
-    haps = list(SeqIO.parse(hap_file, 'fasta'))
-    print('Searching genes for match. This only reports genes covered at least \
-at 75%.\nIndividual aminoacid calls might be present. \n', file=rh)
-    matched_region = parse_region(str(haps[0].seq))
-    if not matched_region:
-        print('None found: mutations not in protease/RT/integrase.\n', file=rh)
-        sys.exit('Haplotypes not in protease/RT/integrase')
-
-    for g in ['protease', 'RT', 'integrase']:
-        mt = 'yes' if g in matched_region else 'no'
-        print('**%s: %s**  ' % (g, mt), file=rh)
-    print ('', file=rh)
-
-    csv_file = 'mutations.csv'
+    #cov_info = get_coverage_info()
 
     print('Parsing DRM from database', file=sys.stderr)
     resistance_mutations = parse_drm()
     print('Shape is: ', resistance_mutations.shape)
 
-    print('Reading mutations from %s' % csv_file, file=sys.stderr)
-    mutation_detected = pd.read_csv(csv_file)
+    print('Reading mutations from %s' % mut_file, file=sys.stderr)
+    mutation_detected = pd.read_csv(mut_file)
     print('Shape is: ', mutation_detected.shape)
 
     mpd = pd.merge(mutation_detected, resistance_mutations, how='left',
                    on=['gene', 'pos'])
-    mpd.to_csv(path_or_buf='merged_muts.csv')
+    mpd.to_csv(path_or_buf='merged_muts_drm_annotated.csv')
     print('Shape of raw merged is: ', mpd.shape)
 
     # too complicated with panda, do it by hand
-    drms = parse_merged('merged_muts.csv')
+    drms = parse_merged('merged_muts_drm_annotated.csv')
     print('Shape of merged is: ', drms.shape)
     #os.remove('merged_muts.csv')
 
@@ -180,7 +162,7 @@ at 75%.\nIndividual aminoacid calls might be present. \n', file=rh)
     cols = ['gene', 'pos', 'mut', 'freq', 'category']
     drms = drms[cols]
     drms.sort(cols[:3], inplace=True)
-    drms.to_csv('annotated_mutations.csv', index=False)
+    drms.to_csv('annotated_DRM.csv', index=False)
 
     for gene in ['protease', 'RT', 'integrase']:
         gene_muts = drms[drms.gene == gene]
@@ -210,12 +192,12 @@ at 75%.\nIndividual aminoacid calls might be present. \n', file=rh)
         print('\n', file=rh)
     rh.close()
     # convert to PDF with pandoc
-    tmpl_file = os.path.abspath(os.path.join(dn_dir, 'template.tex'))
+    tmpl_file = os.path.abspath(os.path.join(db_dir, 'template.tex'))
     pand_cml = 'pandoc --template={} report.md -o report.pdf'.format(tmpl_file)
     print(pand_cml, file=sys.stderr)
     subprocess.call(pand_cml, shell=True)
 
 
 if __name__ == '__main__':
-    args = parse_com_line()
-    main(args.haps)
+    #args = parse_com_line()
+    main()
