@@ -123,10 +123,13 @@ def parse_merged(mer_file):
             row['pos'] = int(row['pos'])
             if row['mut_x'] in aa_unpack(row['mut_y']):
                 mdf = mdf.append(row, ignore_index=True)
+            elif row['mut_x'] == '-' and 'd' in aa_unpack(row['mut_y']):
+                mdf = mdf.append(row, ignore_index=True)
             elif row['mut_x'] and row['mut_y'] == '':
                 row['category'] = 'unannotated'
                 mdf = mdf.append(row, ignore_index=True)
     return mdf
+
 
 def main(mut_file='annotated_mutations.csv', subtypes_file='subtype_evidence.csv'):
     '''What does the main do?'''

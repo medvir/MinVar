@@ -21,8 +21,7 @@ os.sys.path.insert(1, dn_dir)
 import Alignment
 
 RAW_DEPTH_THRESHOLD = 50
-MIN_FRACTION = 0.025
-HAPLO_FREQ_THRESHOLD = 0.025
+MIN_FRACTION = 0.015
 MAPPING_QUALITY_THRESHOLD = 20
 
 # amminoacid sequences from files in db directory
@@ -51,7 +50,7 @@ translation_table = {
 info_fields = {}
 
 
-
+#def recalibrate_qualities(ref_file, bamfile, platform="454"):
 def recalibrate_qualities(ref_file, bamfile, platform="ILLUMINA"):
     '''Invoke GATK BaseRecalibrator, also calling some high confidence variants.
     Follows vipr by Andreas Wilm'''
@@ -173,7 +172,6 @@ def call_variants(ref_file='cns.fasta', bamfile='hq_2_cons_sorted.bam',
         cml = 'lofreq filter -i tmp.vcf -o %s.vcf -v %d -a %f' % \
             (bamstem, RAW_DEPTH_THRESHOLD, MIN_FRACTION)
         subprocess.call(cml, shell=True)
-
 
 
 def main(ref_file='cns_final.fasta', bamfile='hq_2_cons_sorted.bam',

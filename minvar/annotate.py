@@ -21,8 +21,8 @@ os.sys.path.insert(1, dn_dir)
 import Alignment
 
 RAW_DEPTH_THRESHOLD = 50
-MIN_FRACTION = 0.025
-HAPLO_FREQ_THRESHOLD = 0.025
+MIN_FRACTION = 0.015
+HAPLO_FREQ_THRESHOLD = 0.015
 MAPPING_QUALITY_THRESHOLD = 20
 
 # amminoacid sequences from files in db directory
@@ -164,6 +164,7 @@ def parsevar(vcf_file, ref_file):
         wt_nt, alt = lsp[3:5]
         assert ref_nt[pos - 1] == wt_nt[0], 'ref shift: %s not %s' % \
             (ref_nt[pos - 1], wt_nt)
+
         infos = {}
         for a in lsp[7].split(';'):
             asp = a.split('=')
@@ -171,18 +172,7 @@ def parsevar(vcf_file, ref_file):
                 infos[asp[0]] = asp[1]
             except IndexError:
                 infos[asp[0]] = None
-        #infos = dict(a.split('=') for a in lsp[7].split(';'))
-        # ref_for, ref_rev, alt_for, alt_rev = \
-        #     [float(f) for f in infos['DP4'].split(',')]
-        # perc_lost_bases = \
-        #     1. - (ref_for + ref_rev + alt_for + alt_rev) / int(infos['DP'])
-        # if perc_lost_bases > 0.01:
-        #     warnings.warn('Lost %5.2f %% of the reads at position %d' % (100 * perc_lost_bases, pos))
-        #     logging.warning('Lost %5.2f %% of the reads at position %d' % (100 * perc_lost_bases, pos))
-        # aa_mut_here = translate_variants(l, frame, ref_seq)
-        # if aa_mut_here is None:
-        #     continue
-        # for wt_aa, aa_pos, mut_aa, f_mut in aa_mut_here:
+
         for alt_nt, alt_f in zip(alt.split(','), infos['AF'].split(',')):
             if len(alt_nt) != len(wt_nt):  # indel
                 logging.info('indel found at pos %d' % pos)
@@ -296,7 +286,7 @@ def phase_mutations(muts, frame):
         elif len(del_muts) == 3:
             freq_here = sum(del_muts.freq) / 3
             wt_codon = ''.join(del_muts.sort('pos').wt)
-            print('deletion detected at %s%d-' % (wt_codon, i))
+            print('deletion detected: %s%d-' % (wt_codon, i))
             d_here = {'wt': wt_codon, 'pos': i, 'mut': '---', 'freq': freq_here}
             pm = pm.append(d_here, ignore_index=True)
             # target is anyway appended to check the non indel mutations
@@ -433,6 +423,8 @@ def annotate_mutations(mutations, ref):
         if aa_pos != a_mut[0][0]:
             warnings.warn('Is it %d or %d?' % (a_mut, aa_pos))
         B_codon, mut_codon = a_mut[0][1]
+        if 650 < ref_pos and ref_pos <670:
+            print(B_codon, mut_codon, file=sys.stderr)
         if B_codon != mut_codon:
             B_pos = aa_pos + 1
             if B_pos <= 56:
@@ -489,10 +481,10 @@ def main(recalfile, ref_file='cns_final.fasta'):
     vcf_mutations.to_csv('vcf_mutations_nt.csv', index=False, float_format='%6.4f')
 
     # now we have cns_mutations, retrieved from consensus sequence in a fasta file
-    # and vcf_mutations, retrieved from vcf file created with a variant calling method
+    # and vcf_mutations, retrieved from vcf file created with a variant calling method;
     # while cns_mutations has mutations of cns_final.fasta w.r.t. consensus B,
     # vcf_mutations has minority mutations w.r.t. cns_final.fasta.
-    # we need to subtract vcf frequencies from cns ones
+    # We need to subtract vcf frequencies from cns ones
     # the result is mutations w.r.t. consensus B, position is on cns_final
     merged = merge_mutations(cns_mutations, vcf_mutations)
 
@@ -502,11 +494,10 @@ def main(recalfile, ref_file='cns_final.fasta'):
     if not msk.all():
         warnings.warn('frequencies should be normalised')
 
-
     merged.to_csv('merged_mutations_nt.csv', index=False, float_format='%6.4f')
 
     # another step to phase variants that occur together on reads, kind of
-    # making haplotypes
+    # making haplotypes, but only three nt long (one codon)
     phased = phase_mutations(merged, frame)
     phased.to_csv('phased.csv', sep=',', float_format='%6.4f', index=False)
 
@@ -516,3 +507,6 @@ def main(recalfile, ref_file='cns_final.fasta'):
     anno_muts = anno_muts.reset_index()
     anno_muts = anno_muts.sort(columns=['gene', 'pos', 'freq'], ascending=[1, 1, 0])
     anno_muts.to_csv('annotated_mutations.csv', sep=',', float_format='%6.4f', index=False)
+
+if __name__ == '__main__':
+    main(sys.argv[1])

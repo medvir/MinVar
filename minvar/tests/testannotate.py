@@ -15,8 +15,8 @@ os.sys.path.insert(1, minvar_dir)
 mod = __import__('minvar')
 sys.modules["minvar"] = mod
 
-from ReportDRM.src import Alignment
-from minvar import callvar
+from minvar import Alignment
+from minvar import annotate
 
 class TestCallVar(unittest.TestCase):
 
@@ -38,13 +38,13 @@ class TestCallVar(unittest.TestCase):
 		assert os.path.exists(self.test_vcf)
 
 	def test_parse_cons_mutations(self):
-		cm = callvar.parse_cons_mutations(self.ref_1)
+		cm = annotate.parse_cons_mutations(self.ref_1)
 		cm = cm[cm.freq > 0.0]
 		self.assertEqual(len(cm), 2, cm)
 		#self.fail("Test to be written")
 
 	def test_parsevar(self):
-		out = callvar.parsevar(self.test_vcf, self.ref_file_1)
+		out = annotate.parsevar(self.test_vcf, self.ref_file_1)
 		self.assertEqual(len(out), 2, out)
 		out_0 = out.iloc[0]
 		out_1 = out.iloc[1]
@@ -56,14 +56,14 @@ class TestCallVar(unittest.TestCase):
 		self.assertEqual(out_1['mut'], 'C', out)
 
 	def test_find_frame(self):
-		frame, nt_framed, aa_framed = callvar.find_frame(self.ref_1)
+		frame, nt_framed, aa_framed = annotate.find_frame(self.ref_1)
 		self.assertEqual(frame, 3)
 		self.assertEqual(len(nt_framed) % 3, 0)
 		self.assertEqual(nt_framed[-1], 'T', nt_framed)
 		self.assertEqual(aa_framed, 'IYQYMDDLYVGSDLEIGQHRTKIEELRQHLLRWGFTTPDKKHQKEPPFL')
 
 	def test_merge_mutations(self):
-		cm = callvar.parse_cons_mutations(self.ref_1)
+		cm = annotate.parse_cons_mutations(self.ref_1)
 		'''
 		A, 11, G
 		A, 50, T
@@ -72,7 +72,7 @@ class TestCallVar(unittest.TestCase):
 						   ['G', 11, 'T', 0.2],  # already mutated in sample cons
 			               ['T', 50, 'A', 0.1]], # mutates back to cons B
 			              columns=['wt', 'pos', 'mut', 'freq'])
-		m_out = callvar.merge_mutations(cm, vm)
+		m_out = annotate.merge_mutations(cm, vm)
 		# two mutations in consensus, three in vcf but the one in pos 101 is
 		# reverting to consensus B
 		self.assertEqual(len(m_out), 4, m_out)
@@ -89,12 +89,12 @@ class TestCallVar(unittest.TestCase):
 		muts = pd.DataFrame(columns=['gene', 'pos', 'wt', 'mut', 'freq'])
 
 		# no mutation first
-		out = callvar.annotate_mutations(muts, self.ref_3)
+		out = annotate.annotate_mutations(muts, self.ref_3)
 		self.assertEqual(len(out), 0)
 
 		# add one mutation
 		muts = muts.append({'wt': 'T', 'pos': 6, 'mut': 'A', 'freq': 0.2}, ignore_index=True)
-		out = callvar.annotate_mutations(muts, self.ref_3)
+		out = annotate.annotate_mutations(muts, self.ref_3)
 		self.assertEqual(len(out), 1, out)
 		out_0 = out.iloc[0]
 		self.assertEqual(out_0.pos, 2)
@@ -106,3 +106,4 @@ class TestCallVar(unittest.TestCase):
 	def tearDown(self):
 		os.remove(self.ref_file_1)
 		os.remove(self.ref_file_2)
+		os.remove(self.ref_file_3)

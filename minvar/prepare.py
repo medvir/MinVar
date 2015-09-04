@@ -26,25 +26,21 @@ def filter_reads(filename, max_n):
     logging.info('Trimming reads with seqtk')
     if filename.endswith('gz'):
         logging.info('Reads in gzip format')
-        r1 = 'gunzip -c %s | seqtk trimfq - ' % filename
+        r1 = 'gunzip -c %s | seqtk trimfq - | seqtk sample - %d' % (filename, max_n)
     else:
-        r1 = 'seqtk trimfq %s' % filename
+        r1 = 'seqtk trimfq %s | seqtk sample - %d' % (filename, max_n)
 
     oh = open('high_quality.fastq', 'w')
     proc = subprocess.Popen(r1, shell=True, stdout=subprocess.PIPE,
                             universal_newlines=True)
-    i = 0
     with proc.stdout as handle:
         for name, s, quals in FastqGeneralIterator(handle):
-            if i >= max_n:
-                break
             rl = len(s)
             if 'N' in s or rl < min_len:
                 #float(sum(quals)) / rl < qual_thresh or
                 continue
             else:
                 print('@%s\n%s\n+\n%s' % (name, s, quals), file=oh)
-                i += 1
     oh.close()
     return oh.name
 
@@ -190,7 +186,7 @@ def phase_variants(reffile, varfile):
             reflist[pos + i] = r
 
     finalrefseq = ''.join(reflist)
-    fs = SeqRecord(Seq(finalrefseq), id=refseq.id, description='lofreq')
+    fs = SeqRecord(Seq(finalrefseq), id='sample_cons_Pol', description='lofreq')
     SeqIO.write(fs, 'tmp_cns.fasta', 'fasta')
     return 'tmp_cns.fasta'
 
@@ -310,7 +306,7 @@ def main(read_file=None, max_n_reads=200000):
                                 sampled_reads=20000, mapper='bwa')
 
     # change sequence name to sample_cons, remove old file
-    cml = 'sed -e \'s/consensus_B/sample_cons/\' cns_2.fasta > cns_final.fasta'
+    cml = 'sed -e \'s/CONSENSUS_B/sample_cons_Pol/\' cns_2.fasta > cns_final.fasta'
     subprocess.call(cml, shell=True)
     os.remove('cns_2.fasta')
     cml = 'samtools faidx cns_final.fasta'

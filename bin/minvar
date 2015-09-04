@@ -53,3 +53,6 @@ if __name__ == "__main__" and __package__ is None:
 
 	from minvar import reportdrm
 	reportdrm.main()
+
+	from minvar import stats
+	stats.coverage_stats('hq_2_cons_sorted_recal.bam')
