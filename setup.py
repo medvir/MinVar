@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='MinVar',
-      version='0.1',
+      version='1.0',
       description='Minority variants in HIV',
       url='https://github.com/ozagordi/MinVar',
       author='Osvaldo Zagordi',
