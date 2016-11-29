@@ -15,7 +15,7 @@ references_file = os.path.join(dn, 'db/HIV_cons_db')  # used to determine subtyp
 hiv_ref_db = os.path.join(dn, 'db/cons_B_db')  # used to determine consensus
 def_amp = os.path.join(dn, 'db/consensus_B.fna')
 qual_thresh = 20
-min_len = 75
+min_len = 49
 
 
 def filter_reads(filename, max_n):
@@ -24,12 +24,7 @@ def filter_reads(filename, max_n):
 
     # run seqtk trimfq to trim low quality ends
     logging.info('Trimming reads with seqtk')
-    if filename.endswith('gz'):
-        logging.info('Reads in gzip format')
-        r1 = 'gunzip -c %s | seqtk trimfq - | seqtk sample - %d' % (filename, max_n)
-    else:
-        r1 = 'seqtk trimfq %s | seqtk sample - %d' % (filename, max_n)
-
+    r1 = 'seqtk trimfq %s | seqtk sample - %d' % (filename, max_n)
     oh = open('high_quality.fastq', 'w')
     proc = subprocess.Popen(r1, shell=True, stdout=subprocess.PIPE,
                             universal_newlines=True)
@@ -132,7 +127,7 @@ def align_reads(ref=None, reads=None, mapper='bwa'):
         cml = 'novoalign -d cnsref.ndx -f %s -F STDFQ -o SAM > hq_2_cons.sam' % reads
         subprocess.call(cml, shell=True)
 
-    cml = 'samtools view -Su hq_2_cons.sam | samtools sort -@ 6 - hq_2_cons_sorted'
+    cml = 'samtools view -Su hq_2_cons.sam | samtools sort -T /tmp -@ 6 -o hq_2_cons_sorted.bam -'
     subprocess.call(cml, shell=True)
     cml = 'samtools index hq_2_cons_sorted.bam'
     subprocess.call(cml, shell=True)
@@ -216,13 +211,14 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
         subprocess.call(cml, shell=True)
 
         logging.info('convert to SAM -> BAM')
-        b2s_exe = os.path.join(dn, 'blast2sam.py')
+        # b2s_exe = os.path.join(dn, 'blast2sam.py')
+        b2s_exe = 'blast2sam.py'
         cml = b2s_exe
         cml += ' outblast.xml > refcon.sam'
         subprocess.call(cml, shell=True)
 
         # reverse reads are not yet properly treated, so -F 16
-        cml = 'samtools view -F 16 -u refcon.sam | samtools sort - refcon_sorted'
+        cml = 'samtools view -F 16 -u refcon.sam | samtools sort -T /tmp -o refcon_sorted.bam'
         subprocess.call(cml, shell=True)
 
     elif mapper == 'bwa':
@@ -235,7 +231,7 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
         for biw in glob.glob('tmpref.*'):
             os.remove(biw)
         logging.debug('SAM -> BAM -> SORT')
-        cml = 'samtools view -u refcon.sam -@ 6 | samtools sort -@ 6 - refcon_sorted'
+        cml = 'samtools view -u refcon.sam -@ 6 | samtools sort -T /tmp -@ 6 -o refcon_sorted.bam'
         subprocess.call(cml, shell=True)
 
     elif mapper == 'novo':
