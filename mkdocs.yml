@@ -1,0 +1,8 @@
+site_name: Marshmallow Variants
+
+docs_dir: rtd
+
+pages:
+    - Introduction: 'index.md'
+    - User Guide: '_user-guide.md'
+    - About: '_about.md'
