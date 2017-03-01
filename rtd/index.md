@@ -1,5 +1,9 @@
-## Minority Variants
+# MinVar: automatic detection of drug-resistance mutations in HIV-1
 
-Calls minority from a fastq file, annotates them and writes a report.
+MinVar is a tool to analyze deep sequencing data for detection of mutations
+conferring drug resistance in HIV-1 populations.
 
-This is in rtd
+It was developed
+
+
+[Paper](http://dx.doi.org/10.1016/j.jviromet.2016.11.008)

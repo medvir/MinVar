@@ -1,8 +1,8 @@
-site_name: Marshmallow Variants
+site_name: MinVar
 
 docs_dir: rtd
 
 pages:
     - Introduction: 'index.md'
-    - User Guide: '_user-guide.md'
-    - About: '_about.md'
+    - User Guide: 'user-guide.md'
+    - About: 'about.md'
