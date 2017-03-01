@@ -1,0 +1,41 @@
+    <!-- ******CONTACT****** -->
+    <section id="contact" class="contact section has-pattern">
+        <div class="container">
+            <div class="contact-inner">
+                <h2 class="title  text-center">Contact</h2>
+                <div class="row">
+                    <div class="col-md-8">
+                        <h3>Send us a Message</h3>
+                        <form method="POST" action="//formspree.io/zagordi.osvaldo@virology.uzh.ch">
+
+                            <div class="control-group form-group">
+                                <div class="controls">
+                                    <label>name:</label>
+                                    <input type="text" name="name" placeholder="Your name" class="form-control" id="name" required data-validation-required-message="Please enter your name.">
+                                </div>
+                            </div>
+
+                            <div class="control-group form-group">
+                                <div class="controls">
+                                    <label>email address:</label>
+                                    <input type="email" name="_replyto" placeholder="Your email" class="form-control" id="email" required data-validation-required-message="Please enter your email address.">
+                                </div>
+                            </div>
+
+                            <div class="control-group form-group">
+                                <div class="controls">
+                                    <label>message:</label>
+                                        <input type="text" name="name" class="form-control" id="message" required data-validation-required-message="Please enter your message" placeholder="Your message" maxlength="999" style="resize:none">
+                                </div>
+                            </div>
+
+                            <input type="text" name="_gotcha" style="display:none">
+                            <div id="success"></div>
+                            <!-- For success/fail messages -->
+                            <button type="submit" class="btn btn-dark">Send Message</button>
+                        </form>
+                    </div>
+                </div>
+            </div><!--//contact-inner-->
+        </div><!--//container-->
+    </section><!--//contact-->
