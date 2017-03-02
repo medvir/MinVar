@@ -4,5 +4,7 @@ docs_dir: rtd
 
 pages:
     - Introduction: 'index.md'
-    - User Guide: 'user-guide.md'
-    - About: 'about.md'
+    - User Guide:
+        - 'Installation': 'user-guide/installation.md'
+        - 'Output files': 'user-guide/output-files.md'
+    - 'License': 'license.md'
