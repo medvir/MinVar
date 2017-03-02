@@ -49,10 +49,9 @@ in HIV-1 populations using deep sequencing data.
 - The annotated mutations are saved in a csv file (see example above) and also
   included in a report in markdown format that is finally converted to PDF.
 
-### Citation
+#### Citation
 
 MinVar has been introduced and validated in  
-Huber _et al._,
-MinVar: A rapid and versatile tool for HIV-1 drug resistance genotyping by deep sequencing  
-_Journal of virological methods_ (2017) 240:7-13
-[doi:10.1016/j.jviromet.2016.11.008](http://dx.doi.org/10.1016/j.jviromet.2016.11.008)
+Huber, Metzner _et al._, (2017) MinVar: A rapid and versatile tool for HIV-1
+drug resistance genotyping by deep sequencing _Journal of virological methods_
+240:7-13, [doi:10.1016/j.jviromet.2016.11.008](http://dx.doi.org/10.1016/j.jviromet.2016.11.008)
