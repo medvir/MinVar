@@ -4,18 +4,17 @@ The most important outputs are `annotated_DRM.csv`, a comma-separated-value file
 that can be conveniently opened in any spreadsheet program, and `report.md`,
 a mostly comprehensive report of the sample written in markdown format and that
 includes the columns from `annotated_DRM.csv`. Other files are discussed below.
-
 The columns are, in order,
 
-- **`gene`**, can be RT (reverse transcriptase), protease, or integrase (GagPolTF
+- `gene`, can be RT (reverse transcriptase), protease, or integrase (GagPolTF
   is included in `annotated_DRM.csv`, but not in the final report),
-- **`pos`**, a number indicating the position on that gene where a
+- `pos`, a number indicating the position on that gene where a
   mutation with respect to
   [consensus B](https://hivdb.stanford.edu/pages/documentPage/consensus_amino_acid_sequences.html)
   sequence was observed,
-- **`mut`**, the amino acid found at that position, if different from consensus B,
-- **`freq`**, the frequency at which it was found,
-- **`category`**, the classification of the mutation according to HIVDB.
+- `mut`, the amino acid found at that position, if different from consensus B,
+- `freq`, the frequency at which it was found,
+- `category`, the classification of the mutation according to HIVDB.
 
 The report also includes a rough estimate of the subtype for the analyzed sample.
 This is done by aligning a subset of reads to sequences representative of
