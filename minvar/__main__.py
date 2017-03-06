@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3.4
+#!/usr/bin/env python3
 
 import os
 import sys
@@ -12,43 +12,36 @@ def main():
     group1 = parser.add_argument_group('Input files', 'Required input')
     group1.add_argument("-f", "--fastq", default="", type=str, dest="f",
                         help="input reads in fastq format")
-    args = parser.parse_args()
-    # manipulate path to import functions
-    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    os.sys.path.insert(1, parent_dir)
-    mod = __import__('minvar')
-    sys.modules["minvar"] = mod
+
+    # exit so that log file is not written
+    if len(sys.argv) == 1 or sys.argv[1] == '-h' or sys.argv[1] == '--help':
+        parser.print_help()
+        sys.exit()
+
     import logging
     import logging.handlers
-    # Make a global logging object.
-    mylog = logging.getLogger(__name__)
-    dn = os.path.dirname(__file__)
-    # set logging level
-    mylog.setLevel(logging.DEBUG)
-    # This handler writes everything to a file.
-    LOG_FILENAME = './minvar.log'
-    h = logging.handlers.RotatingFileHandler(LOG_FILENAME, 'w',
-                                             maxBytes=100000, backupCount=5)
-    f = logging.Formatter("%(levelname)s %(asctime)s %(funcName)s%(lineno)d %(message)s")
-    h.setFormatter(f)
-    mylog.addHandler(h)
-    mylog.info(' '.join(sys.argv))
+
+    logging.basicConfig(filename='minvar.log', level=logging.DEBUG,
+                        format='%(levelname)s %(asctime)s %(filename)s: %(funcName)s() %(lineno)d: \t%(message)s', datefmt='%Y/%m/%d %H:%M:%S')
+    logging.info(' '.join(sys.argv))
+
+    args = parser.parse_args()
 
     from minvar import prepare
-    prepare.main(args.f)
+    cns_file, prepared_bam = prepare.main(args.f)
 
     from minvar import callvar
-    recal_file = callvar.main(ref_file='cns_final.fasta',
-    	                      bamfile='hq_2_cons_sorted.bam', caller='lofreq')
+    called_file = callvar.main(ref_file=cns_file, bamfile=prepared_bam,
+                               caller='lofreq', recalibrate=False)
 
     from minvar import annotate
-    annotate.main(recal_file)
+    annotate.main(vcf_file=called_file, ref_file=cns_file)
 
     from minvar import reportdrm
     reportdrm.main()
 
     from minvar import stats
-    stats.coverage_stats('hq_2_cons_sorted_recal.bam')
+    stats.coverage_stats(prepared_bam)
 
 if __name__ == "__main__": #  and __package__ is None:
     main()

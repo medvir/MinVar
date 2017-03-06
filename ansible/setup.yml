@@ -1,0 +1,196 @@
+---
+########################
+# Test if MinVar works #
+########################
+
+- hosts: tryminvar
+  remote_user: ubuntu
+  become: yes
+
+  tasks:
+
+    - hostname:
+        name: tryminvar
+
+    - name: Ensure sysadmin SSH keys are authorized for user 'ubuntu'
+      authorized_key: user="ubuntu" key="{{ item }}"
+      with_file:
+        - ~/.ssh/oct2016.key.pub
+
+
+    # - name: Upgrade all installed packages to latest version
+    #   apt:
+    #     upgrade=yes
+
+    - name: Install required software
+      apt:
+        name={{ item }}
+        update_cache=yes
+        # state=latest
+      with_items:
+        - acl
+        - automake
+        - build-essential
+        - bwa
+        - cmake
+        - cython
+        - default-jre
+        - emboss
+        - git
+        - libfreetype6-dev
+        - libhdf5-serial-dev
+        - libncurses5-dev
+        - libtool
+        - libwww-perl
+        - make
+        - muscle
+        - pkg-config
+        - python-dev
+        - python-setuptools
+        - r-cran-ggplot2
+        - seqtk
+        - tabix
+        - unzip
+        - zlib1g-dev
+
+    - name: Download blast
+      get_url:
+        url: ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.5.0/ncbi-blast-2.5.0+-x64-linux.tar.gz
+        # url: ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.6.0/ncbi-blast-2.6.0+-x64-linux.tar.gz
+        dest: /tmp/ncbi-blast-2.5.0+-x64-linux.tar.gz
+      register: get_blast
+
+    - debug: msg="blast was downloaded"
+      when: get_blast|changed
+
+    - name: Install blast
+      shell: |
+        if [ ! -x "$(command -v blastn)" ]; then
+            set -ex
+            cd /tmp
+            tar -xz -f ncbi-blast-2.5.0+-x64-linux.tar.gz
+            sudo install -t /usr/local/bin /tmp/ncbi-blast-2.5.0+/bin/*
+        fi
+      args:
+        executable: /bin/bash
+
+    - name: Download samtools
+      get_url:
+        url: https://github.com/samtools/samtools/releases/download/1.3/samtools-1.3.tar.bz2
+        dest: /tmp/samtools-1.3.tar.bz2
+      register: get_samtools
+
+    - debug: msg="samtools was downloaded"
+      when: get_samtools|changed
+
+    - name: Install samtools
+      shell: |
+        if [ ! -x "$(command -v samtools)" ]; then
+            set -ex
+            cd /tmp
+            tar -xj -f samtools-1.3.tar.bz2
+            cd samtools-1.3
+            make -j 2 && make install
+        fi
+      args:
+        executable: /bin/bash
+
+    - name: Install lofreq
+      shell: |
+        if [ ! -x "$(command -v lofreq)" ]; then
+            cd /tmp
+            # wget -nv -O - https://github.com/CSB5/lofreq/archive/v2.1.2.tar.gz | tar -xz
+            git clone https://github.com/ozagordi/lofreq.git
+            # cd lofreq-2.1.2
+            cd lofreq
+            wget -nv -O - http://downloads.sourceforge.net/project/samtools/samtools/1.1/samtools-1.1.tar.bz2 | tar -xj
+            cd samtools-1.1
+            make -j 2
+            cd ..
+            libtoolize
+            ./bootstrap && ./configure SAMTOOLS=${PWD}/samtools-1.1/ HTSLIB=${PWD}/samtools-1.1/htslib-1.1/ && \
+            make -j 2 && make install
+            cd ..
+        fi
+      args:
+        executable: /bin/bash
+
+    - name: Install prinseq
+      shell: |
+        if [ ! -x "$(command -v prinseq)" ]; then
+            cd /tmp
+            wget -nv -O - http://downloads.sourceforge.net/project/prinseq/standalone/prinseq-lite-0.20.4.tar.gz | \
+                tar -xz
+            sudo install -v prinseq-lite-0.20.4/prinseq-lite.pl /usr/local/bin/prinseq
+        fi
+      args:
+        executable: /bin/bash
+
+    - name: Download edirect tools
+      get_url:
+        url: ftp://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/edirect.zip
+        dest: /usr/local/edirect.zip
+      register: get_edirect
+
+    - name: Install edirect
+      shell: |
+        if [ ! -x "/usr/local/edirect/esearch" ]; then
+            cd /usr/local
+            sudo unzip -u -q edirect.zip
+            sudo ./edirect/setup.sh
+        fi
+      args:
+        executable: /bin/bash
+
+    - name: Make picard directory
+      file: path=/usr/local/picard-tools state=directory mode=0755
+
+    - name: Install picard
+      get_url:
+        url: https://github.com/broadinstitute/picard/releases/download/2.7.1/picard.jar
+        dest: /usr/local/picard-tools/picard.jar
+
+    - name: Change group of /opt
+      file:
+        path: /opt
+        owner: ubuntu
+        mode: 0775
+
+    - name: Download miniconda
+      get_url:
+        url: https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+        dest: /tmp/miniconda.sh
+        #checksum: sha1:f43e58f0f2d2f64dcd4924edb8fbd4f4654db086
+      register: get_miniconda
+
+    - name: Install miniconda and packages
+      shell: |
+        if [ ! -x "/opt/miniconda/bin/conda" ]; then
+            cd /tmp
+            bash miniconda.sh -b -p /opt/miniconda
+            hash -r && \
+                /opt/miniconda/bin/conda config --set always_yes yes --set changeps1 no && \
+                /opt/miniconda/bin/conda update -q conda
+            /opt/miniconda/bin/conda install -q Biopython pandas seaborn scipy
+        fi
+      args:
+          executable: /bin/bash
+
+    - name: Change group of /opt/miniconda
+      file:
+        path: /opt/miniconda
+        owner: ubuntu
+        mode: 0775
+        recurse: yes
+
+    - name: Install MinVar
+      shell: |
+        if [ ! -x "/opt/miniconda/bin/minvar" ]; then
+            cd /opt
+            rm -rf MinVar
+            git clone --depth=50 --branch=master https://github.com/ozagordi/MinVar.git \
+                && cd /opt/MinVar \
+                && /opt/miniconda/bin/python3 setup.py install --record installed_files.txt
+        fi
+      args:
+          executable: /bin/bash
