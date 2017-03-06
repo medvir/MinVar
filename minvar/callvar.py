@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3.4
+#!/usr/bin/env python3
 '''Calls lofreq to produce a vcf file'''
 
 import sys
@@ -23,6 +23,11 @@ import Alignment
 RAW_DEPTH_THRESHOLD = 50
 MIN_FRACTION = 0.015
 MAPPING_QUALITY_THRESHOLD = 20
+
+try:
+    CPUS = max(1, os.cpu_count())
+except TypeError:
+    CPUS = 1
 
 # amminoacid sequences from files in db directory
 db_dir = os.path.abspath(os.path.join(dn_dir, 'db'))
@@ -72,7 +77,7 @@ def recalibrate_qualities(ref_file, bamfile, platform="ILLUMINA"):
     cml = 'samtools index subsampled.bam'
     subprocess.call(cml, shell=True)
 
-    cml = 'lofreq call-parallel --pp-threads 6 -f %s -o tmp.vcf subsampled.bam' % ref_file
+    cml = 'lofreq call-parallel --pp-threads %d -f %s -o tmp.vcf subsampled.bam' % (min(6, CPUS), ref_file)
     subprocess.call(cml, shell=True)
     cml = 'lofreq filter -v 200 -V 2000 -a 0.40 -i tmp.vcf -o known.vcf'
     subprocess.call(cml, shell=True)
@@ -93,7 +98,7 @@ def recalibrate_qualities(ref_file, bamfile, platform="ILLUMINA"):
     subprocess.call(cml, shell=True)
 
     # first pass to parse features
-    cml = 'java -jar /usr/local/GATK/GenomeAnalysisTK.jar -T BaseRecalibrator  --maximum_cycle_value 600'
+    cml = 'java -jar /usr/local/GATK/GenomeAnalysisTK.jar -T BaseRecalibrator --maximum_cycle_value 600'
     cml += ' -I grouped.bam -l INFO -R %s -o recal_data.grp -knownSites known.vcf' % ref_file
     subprocess.call(cml, shell=True)
 
@@ -105,8 +110,7 @@ def recalibrate_qualities(ref_file, bamfile, platform="ILLUMINA"):
     return recalfile
 
 
-def call_variants(ref_file='cns.fasta', bamfile='hq_2_cons_sorted.bam',
-                  parallel=True, n_regions=8, caller='lofreq'):
+def call_variants(ref_file=None, bamfile=None, parallel=True, n_regions=8, caller='lofreq'):
     '''Wrapper to call lofreq (also other tools originally)'''
     bamstem, bamext = os.path.splitext(bamfile)  # '.'.join(bamfile.split('.')[:-1])
     assert bamext == '.bam', bamfile + bamext
@@ -135,6 +139,8 @@ def call_variants(ref_file='cns.fasta', bamfile='hq_2_cons_sorted.bam',
         cml += ' --haplotype-length 50'
         cml += ' --fasta-reference %s %s > %s.vcf' % (ref_file, bamfile, bamstem)
         subprocess.call(cml, shell=True)
+        return '%s.vcf' % bamstem
+
     elif not parallel and caller == 'freebayes':
         cml = 'freebayes'
         cml += ' --min-alternate-count 10 --min-coverage %s' % RAW_DEPTH_THRESHOLD
@@ -142,11 +148,12 @@ def call_variants(ref_file='cns.fasta', bamfile='hq_2_cons_sorted.bam',
         cml += ' --haplotype-length 50'
         cml += ' --fasta-reference %s %s > %s.vcf' % (ref_file, bamfile, bamstem)
         subprocess.call(cml, shell=True)
+        return '%s.vcf' % bamstem
 
     # lofreq here
     elif parallel and caller == 'lofreq':
         cml = 'lofreq call-parallel --pp-threads %d --call-indels -f %s -o tmp.vcf %s' % \
-            (n_regions, ref_file, bamfile)
+            (min(6, CPUS), ref_file, bamfile)
         subprocess.call(cml, shell=True)
     elif not parallel and caller == 'lofreq':
         cml = 'lofreq call -f %s -o tmp.vcf %s' % (ref_file, bamfile)
@@ -166,30 +173,40 @@ def call_variants(ref_file='cns.fasta', bamfile='hq_2_cons_sorted.bam',
         print("haploid\t1", file=open('samples.txt', 'w'))
         cml = 'bcftools call -S samples.txt -m -v gr.mpileup >  %s.vcf' % bamstem
         subprocess.call(cml, shell=True)
+        return '%s.vcf' % bamstem
 
     # lofreq still needs filtering
     if caller == 'lofreq':
         cml = 'lofreq filter -i tmp.vcf -o %s.vcf -v %d -a %f' % \
             (bamstem, RAW_DEPTH_THRESHOLD, MIN_FRACTION)
         subprocess.call(cml, shell=True)
+        return '%s.vcf' % bamstem
 
 
-def main(ref_file='cns_final.fasta', bamfile='hq_2_cons_sorted.bam',
-         parallel=True, n_regions=6, caller='lofreq'):
+def main(ref_file=None, bamfile=None, parallel=True, n_regions=6,
+         caller='lofreq', recalibrate=True):
     '''What does a main do?'''
-
 
     # call variants
     bamstem, bamext = os.path.splitext(bamfile)
     assert bamext == '.bam', bamext
-    if os.path.exists('%s.vcf' % bamstem):
-        logging.info('vcf file exists, reading from it')
-    else:
+
+    called_file = '%s.vcf' % bamstem
+    if os.path.exists(called_file):
+        logging.info('vcf file exists, not calling new variants')
+        return called_file
+
+    if recalibrate:
         logging.info('recalibrating base qualities')
         recalfile = recalibrate_qualities(ref_file, bamfile)
         logging.info('calling variants with %s' % caller)
-        call_variants(ref_file, recalfile, parallel, n_regions, caller)
-    return recalfile
+        called_file = call_variants(ref_file, recalfile, parallel, n_regions, caller)
+    else:
+        logging.info('base qualities will not be recalibrated')
+        logging.info('skip to calling variants with %s' % caller)
+        called_file = call_variants(ref_file, bamfile, parallel, n_regions, caller)
+
+    return called_file
 
 if __name__ == '__main__':
     main()

@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3.4
+#!/usr/bin/env python3
 
 import os
 import os.path
@@ -17,6 +17,10 @@ def_amp = os.path.join(dn, 'db/consensus_B.fna')
 qual_thresh = 20
 min_len = 49
 
+try:
+    CPUS = max(1, os.cpu_count())
+except TypeError:
+    CPUS = 1
 
 def filter_reads(filename, max_n):
     '''Use seqtk and Biopython to trim and filter low quality reads'''
@@ -56,7 +60,7 @@ def find_subtype(sampled_reads=1000, remote=False):
                                    universal_newlines=True)
 
     # prepare blast to subject sequences
-    blast_cmline = 'blastn -task megablast -query sample_hq.fasta -outfmt 6 -num_threads 6'
+    blast_cmline = 'blastn -task megablast -query sample_hq.fasta -outfmt 6 -num_threads %d' % min(6, CPUS)
     blast_cmline += ' -db {} -out {}'.format(references_file, loc_hit_file)
     bout = subprocess.check_output(blast_cmline, shell=True,
                                    universal_newlines=True)
@@ -108,18 +112,18 @@ def find_subtype(sampled_reads=1000, remote=False):
     # return
 
 
-def align_reads(ref=None, reads=None, mapper='bwa'):
+def align_reads(ref=None, reads=None, out_file=None, mapper='bwa'):
     '''Align all high quality reads to found reference with smalt,
     convert and sort with samtools'''
     if mapper == 'smalt':
         cml = 'smalt index -k 7 -s 2 cnsref %s' % ref
         subprocess.call(cml, shell=True)
-        cml = 'smalt map -n 12 -o hq_2_cons.sam -x -c 0.8 -y 0.8 cnsref %s' % reads
+        cml = 'smalt map -n %d -o hq_2_cons.sam -x -c 0.8 -y 0.8 cnsref %s' % (min(12, CPUS), reads)
         subprocess.call(cml, shell=True)
     elif mapper == 'bwa':
         cml = 'bwa index -p cnsref %s' % ref
         subprocess.call(cml, shell=True)
-        cml = 'bwa mem -t 12 -O 12 cnsref %s > hq_2_cons.sam' % reads
+        cml = 'bwa mem -t %d -O 12 cnsref %s > hq_2_cons.sam' % (min(12, CPUS), reads)
         subprocess.call(cml, shell=True)
     elif mapper == 'novo':
         cml = 'novoindex cnsref.ndx %s' % ref
@@ -127,13 +131,14 @@ def align_reads(ref=None, reads=None, mapper='bwa'):
         cml = 'novoalign -d cnsref.ndx -f %s -F STDFQ -o SAM > hq_2_cons.sam' % reads
         subprocess.call(cml, shell=True)
 
-    cml = 'samtools view -Su hq_2_cons.sam | samtools sort -T /tmp -@ 6 -o hq_2_cons_sorted.bam -'
+    cml = 'samtools view -Su hq_2_cons.sam | samtools sort -T /tmp -@ %d -o %s -' % (min(4, CPUS), out_file)
     subprocess.call(cml, shell=True)
-    cml = 'samtools index hq_2_cons_sorted.bam'
+    cml = 'samtools index %s' % out_file
     subprocess.call(cml, shell=True)
 
     os.remove('hq_2_cons.sam')
-    return
+
+    return out_file
 
 
 def phase_variants(reffile, varfile):
@@ -225,20 +230,20 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
         logging.info('mapping reads with bwa')
         cml = 'bwa index -p tmpref %s' % ref_file
         subprocess.call(cml, shell=True)
-        cml = 'bwa mem -t 12 -O 12 tmpref hq_smp.fastq > refcon.sam'
+        cml = 'bwa mem -t %d -O 12 tmpref hq_smp.fastq > refcon.sam' % min(CPUS, 12)
         subprocess.call(cml, shell=True)
         logging.debug('remove index files')
         for biw in glob.glob('tmpref.*'):
             os.remove(biw)
         logging.debug('SAM -> BAM -> SORT')
-        cml = 'samtools view -u refcon.sam -@ 6 | samtools sort -T /tmp -@ 6 -o refcon_sorted.bam'
+        cml = 'samtools view -u refcon.sam | samtools sort -T /tmp -@ %d -o refcon_sorted.bam' % min(6, CPUS)
         subprocess.call(cml, shell=True)
 
     elif mapper == 'novo':
         logging.info('mapping with novoalign')
         cml = 'novoindex tmpref.ndx %s' % ref_file
         subprocess.call(cml, shell=True)
-        cml = 'novoalign -c 12 -d tmpref.ndx -f hq_smp.fastq -F STDFQ -o SAM > refcon.sam'
+        cml = 'novoalign -c %d -d tmpref.ndx -f hq_smp.fastq -F STDFQ -o SAM > refcon.sam' % min(12, CPUS)
         subprocess.call(cml, shell=True)
         os.remove('tmpref.ndx')
 
@@ -274,7 +279,7 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
         logging.info('applying variants to consensus')
         cml = 'samtools faidx %s' % ref_file
         subprocess.call(cml, shell=True)
-        cml = 'lofreq call-parallel --pp-threads 6 -f %s refcon_sorted.bam -o calls.vcf' % ref_file
+        cml = 'lofreq call-parallel --pp-threads %d -f %s refcon_sorted.bam -o calls.vcf' % (min(CPUS, 6), ref_file)
         subprocess.call(cml, shell=True)
         phase_variants(ref_file, 'calls.vcf')
         cml = 'bgzip -f calls.vcf'
@@ -310,7 +315,9 @@ def main(read_file=None, max_n_reads=200000):
 
     find_subtype()
 
-    align_reads(ref='cns_final.fasta', reads=filtered_file)
+    prepared_file = align_reads(ref='cns_final.fasta', reads=filtered_file, out_file='hq_2_cns_final.bam')
+
+    return 'cns_final.fasta', prepared_file
 
 if __name__ == "__main__":
     main()
