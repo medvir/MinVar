@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3.4
+#!/usr/bin/env python3
 '''Calls lofreq to produce a vcf file'''
 
 import sys
@@ -281,7 +281,7 @@ def phase_mutations(muts, frame):
         # if frameshift, nothing is saved
         if len(del_muts) < 3:
             #warnings.warn('frameshift deletion detected at pos:%d-%d' % (i, i + 2))
-            logging.info('frameshift deletion detected at pos:%d-%d' % (i, i + 2))
+            logging.debug('frameshift deletion detected at pos:%d-%d' % (i, i + 2))
         # if in frame, save with mean frequency
         elif len(del_muts) == 3:
             freq_here = sum(del_muts.freq) / 3
@@ -452,7 +452,7 @@ def annotate_mutations(mutations, ref):
     return anno_variants
 
 
-def main(recalfile, ref_file='cns_final.fasta'):
+def main(vcf_file=None, ref_file=None):
     '''
     '''
     # parse mutations already found in the consensus wrt to
@@ -469,10 +469,10 @@ def main(recalfile, ref_file='cns_final.fasta'):
     cns_diff = cns_diff[cns_diff.freq == 1.0]
     cns_diff.to_csv('cns_mutations_nt.csv', index=True)
 
-    recalstem = os.path.splitext(recalfile)[0]
+    vcf_stem = os.path.splitext(vcf_file)[0]
 
     # parse mutations in vcf file
-    vcf_mutations = parsevar('%s.vcf' % recalstem, ref_file)
+    vcf_mutations = parsevar('%s.vcf' % vcf_stem, ref_file)
 
     if vcf_mutations.shape[0]:
         # synonymous mutations can be merged
