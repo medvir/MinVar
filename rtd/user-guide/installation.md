@@ -28,15 +28,15 @@ its dependencies on a dedicated machine. The files therein define an
 #### What is Ansible
 
 Ansible is a deployment tool that allows an automatic provisioning of machines
-on the cloud (it can be used on AWS, DigitalOcean, Google Cloud Platform etc.)
-The user installs ansible on a local machine (this can be your old laptop),
-defines ansible commands in specific files and uses them to set up a remote
-machine.
+on the cloud (it can be used on AWS, DigitalOcean, Google Cloud Platform etc.).
+The user installs it on a local machine (this can be your old laptop), defines
+commands in specific files and uses them to set up a remote machine.
 
 In the following we will assume that you have installed ansible on your local
 laptop and you want to set up MinVar on a remote machine running Linux Ubuntu 16.04.
 The access to this machine is provided by private-public SSH key pair that must be
-set up. Good instructions for this task can be found in this [help](https://help.ubuntu.com/community/SSH/OpenSSH/Keys).
+set up. Good instructions for this task can be found in this
+[help](https://help.ubuntu.com/community/SSH/OpenSSH/Keys).
 
 #### How to proceed
 
@@ -46,10 +46,10 @@ set up. Good instructions for this task can be found in this [help](https://help
    or download/unzip it,
 3. move to the directory `ansible` in the cloned repository and identify the file
    `hosts`. This file contains two lines `[minvarmachine]` and a fake ip address.
-   Adapt to the name of the machine you want to setup and its address,
+   Edit the address to the one of the machine you want to setup,
 4. in the same directory edit the file `setup-hosts.sh`: adapt
-   `--key-file=path_to_your_private_key` to point to your personal *private* key,
-5. copy your personal *public* key into `my.key`,
+   `--key-file=path_to_your_private_key` to point to your personal **private** key,
+5. copy your personal **public** key into `my.key`,
 6. run `./setup-hosts.sh`.
 
 #### What can go wrong
@@ -59,6 +59,11 @@ on Ubuntu 14.04, but you need to switch to a newer version of Java provided by
 Oracle in order to run `picard`. You can find
 [here](https://www.digitalocean.com/community/tutorials/how-to-install-java-with-apt-get-on-ubuntu-16-04)
 a good tutorial on this.
+
+`UNREACHABLE!` usually means that the private/public key pair does not work.
+You must be able to ssh into the remote machine with this command (edit accordingly)
+
+    ssh -i path_to_your_private_key ubuntu@remote_ip_address
 
 ### If you don't want to use ansible
 

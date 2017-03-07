@@ -2,5 +2,4 @@ __pycache__/
 *pyc
 .dropbox.attr
 ansible/setup.retry
-my.key
 my.key.pub
