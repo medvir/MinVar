@@ -32,7 +32,7 @@ def main():
 
     from minvar import callvar
     called_file = callvar.main(ref_file=cns_file, bamfile=prepared_bam,
-                               caller='lofreq', recalibrate=False)
+                               caller='lofreq', recalibrate=True)
 
     from minvar import annotate
     annotate.main(vcf_file=called_file, ref_file=cns_file)
