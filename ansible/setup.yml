@@ -1,22 +1,18 @@
 ---
-########################
-# Test if MinVar works #
-########################
+#######################################
+# This provides everything for MinVar #
+#######################################
 
-- hosts: tryminvar
+- hosts: minvarmachine
   remote_user: ubuntu
   become: yes
 
   tasks:
 
-    - hostname:
-        name: tryminvar
-
     - name: Ensure sysadmin SSH keys are authorized for user 'ubuntu'
       authorized_key: user="ubuntu" key="{{ item }}"
       with_file:
-        - ~/.ssh/oct2016.key.pub
-
+        - my.key.pub
 
     # - name: Upgrade all installed packages to latest version
     #   apt:
@@ -30,6 +26,7 @@
       with_items:
         - acl
         - automake
+        - bedtools
         - build-essential
         - bwa
         - cmake
@@ -47,7 +44,6 @@
         - pkg-config
         - python-dev
         - python-setuptools
-        - r-cran-ggplot2
         - seqtk
         - tabix
         - unzip
@@ -156,6 +152,18 @@
         owner: ubuntu
         mode: 0775
 
+    - name: Download pandoc packages
+      get_url:
+          url: https://github.com/jgm/pandoc/releases/download/1.19.2.1/pandoc-1.19.2.1-1-amd64.deb
+          dest: /tmp/pandoc-1.19.2.1-1-amd64.deb
+      register: get_pandoc
+
+    - name: Install pandoc
+      shell: |
+        if [ ! -x "$(command -v pandoc)" ]; then
+           dpkg -i /tmp/pandoc-1.19.2.1-1-amd64.deb
+        fi
+
     - name: Download miniconda
       get_url:
         url: https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
@@ -171,7 +179,7 @@
             hash -r && \
                 /opt/miniconda/bin/conda config --set always_yes yes --set changeps1 no && \
                 /opt/miniconda/bin/conda update -q conda
-            /opt/miniconda/bin/conda install -q Biopython pandas seaborn scipy
+            /opt/miniconda/bin/conda install -q Biopython pandas
         fi
       args:
           executable: /bin/bash
@@ -194,3 +202,10 @@
         fi
       args:
           executable: /bin/bash
+
+    - name: Add directories to PATH
+      lineinfile: dest=/home/{{item.user}}/.bash_profile
+                  line="export PATH=$PATH:/usr/local/edirect:/usr/local/vcflib:/opt/miniconda/bin"
+                  create=yes
+      with_items:
+        - { user: "ubuntu" }
