@@ -257,7 +257,7 @@ def merge_mutations(cons_muts, vcf_muts):
     return cc
 
 
-def phase_mutations(muts, frame):
+def phase_mutations(muts, frame, bam_file):
     '''Looks for mutations affecting the same codon and checks on the reads
     whether they really occur together
     '''
@@ -318,7 +318,7 @@ def phase_mutations(muts, frame):
     for t in targets:
         haps = {}
         coverage = 0
-        cml = 'samtools view hq_2_cons_sorted_recal.bam sample_cons_Pol:%d-%d' % t
+        cml = 'samtools view %s sample_cons_Pol:%d-%d' % (bam_file, t[0], t[1])
         proc = subprocess.Popen(cml, shell=True, stdout=subprocess.PIPE,
                                 universal_newlines=True)
         with proc.stdout as handle:
@@ -452,7 +452,7 @@ def annotate_mutations(mutations, ref):
     return anno_variants
 
 
-def main(vcf_file=None, ref_file=None):
+def main(vcf_file=None, ref_file=None, bam_file=None):
     '''
     '''
     # parse mutations already found in the consensus wrt to
@@ -498,7 +498,7 @@ def main(vcf_file=None, ref_file=None):
 
     # another step to phase variants that occur together on reads, kind of
     # making haplotypes, but only three nt long (one codon)
-    phased = phase_mutations(merged, frame)
+    phased = phase_mutations(merged, frame, bam_file)
     phased.to_csv('phased.csv', sep=',', float_format='%6.4f', index=False)
 
     # mutations can now be annotated and saved

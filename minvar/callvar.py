@@ -201,12 +201,14 @@ def main(ref_file=None, bamfile=None, parallel=True, n_regions=6,
         recalfile = recalibrate_qualities(ref_file, bamfile)
         logging.info('calling variants with %s' % caller)
         called_file = call_variants(ref_file, recalfile, parallel, n_regions, caller)
+        called_bam = recalfile
     else:
         logging.info('base qualities will not be recalibrated')
         logging.info('skip to calling variants with %s' % caller)
         called_file = call_variants(ref_file, bamfile, parallel, n_regions, caller)
+        called_bam = bamfile
 
-    return called_file
+    return called_file, called_bam
 
 if __name__ == '__main__':
     main()

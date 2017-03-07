@@ -31,11 +31,11 @@ def main():
     cns_file, prepared_bam = prepare.main(args.f)
 
     from minvar import callvar
-    called_file = callvar.main(ref_file=cns_file, bamfile=prepared_bam,
+    called_file, called_bam = callvar.main(ref_file=cns_file, bamfile=prepared_bam,
                                caller='lofreq', recalibrate=True)
 
     from minvar import annotate
-    annotate.main(vcf_file=called_file, ref_file=cns_file)
+    annotate.main(vcf_file=called_file, ref_file=cns_file, bam_file=called_bam)
 
     from minvar import reportdrm
     reportdrm.main()
