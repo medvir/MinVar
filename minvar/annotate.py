@@ -343,7 +343,7 @@ def phase_mutations(muts, frame, bam_file):
                         pass
                 d_here = {'wt': 'XYZ', 'pos': t[0], 'mut': k, 'freq': freq_here}
                 pm = pm.append(d_here, ignore_index=True)
-                logging.info(k, freq_here, t[0])
+                logging.info('%s %f %d', % (k, freq_here, t[0]))
         logging.info('<------>')
     muts = muts.reset_index()
     pm = pm.reset_index()
