@@ -18,6 +18,10 @@
     #   apt:
     #     upgrade=yes
 
+    - name: Add repo for openjdk-7
+      apt_repository:
+        repo: 'ppa:openjdk-r/ppa'
+
     - name: Install required software
       apt:
         name={{ item }}
@@ -31,7 +35,6 @@
         - bwa
         - cmake
         - cython
-        - default-jre
         - emboss
         - git
         - libfreetype6-dev
@@ -41,6 +44,8 @@
         - libwww-perl
         - make
         - muscle
+        - maven
+        - openjdk-7-jdk
         - pkg-config
         - python-dev
         - python-setuptools
@@ -138,13 +143,33 @@
       args:
         executable: /bin/bash
 
+    - name: Install GATK
+      shell: |
+        if [ ! -e "/usr/local/GATK/GenomeAnalysisTK.jar" ]; then
+            cd /tmp
+            rm -rf gatk-protected
+            git clone --depth=50 --branch=master https://github.com/broadgsa/gatk-protected.git \
+                && cd /tmp/gatk-protected \
+                && git checkout tags/3.3
+            mvn clean install \
+                && sudo mkdir /usr/local/GATK \
+                && sudo install target/GenomeAnalysisTK.jar /usr/local/GATK
+        fi
+      args:
+          executable: /bin/bash
+
     - name: Make picard directory
       file: path=/usr/local/picard-tools state=directory mode=0755
 
     - name: Install picard
-      get_url:
-        url: https://github.com/broadinstitute/picard/releases/download/2.7.1/picard.jar
-        dest: /usr/local/picard-tools/picard.jar
+      shell: |
+        if [ ! -e "/usr/local/picard-tools/picard.jar" ]; then
+            cd /tmp
+            rm -rf picard-tools-1.141
+            wget -q https://github.com/broadinstitute/picard/releases/download/1.141/picard-tools-1.141.zip
+            unzip picard-tools-1.141.zip && \
+                sudo install picard-tools-1.141/picard.jar /usr/local/picard-tools/
+        fi
 
     - name: Change group of /opt
       file:

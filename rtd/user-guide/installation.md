@@ -11,13 +11,6 @@ A condensed list of dependencies
 - bwa
 - lofreq
 
-### Install GATK
-
-GATK is not (yet?) included in the instructions below because you need
-to register online [here](https://software.broadinstitute.org/gatk/download/)
-in order to download it. Then, install it in `/usr/local/GATK`. MinVar expects
-to find the Java archive file `/usr/local/GATK/GenomeAnalysisTK.jar`.
-
 ### Setting up with Ansible
 
 The directory [`ansible`](https://github.com/ozagordi/MinVar/tree/master/ansible)
@@ -55,10 +48,9 @@ set up. Good instructions for this task can be found in this
 #### What can go wrong
 
 We assumed that you have an Ubuntu 16.04 available. Most of the stuff will work
-on Ubuntu 14.04, but you need to switch to a newer version of Java provided by
-Oracle in order to run `picard`. You can find
-[here](https://www.digitalocean.com/community/tutorials/how-to-install-java-with-apt-get-on-ubuntu-16-04)
-a good tutorial on this.
+on Ubuntu 14.04, but you might run into troubles because of different versions
+of Java (you can find a good tutorial on this
+[here](https://www.digitalocean.com/community/tutorials/how-to-install-java-with-apt-get-on-ubuntu-16-04)).
 
 `UNREACHABLE!` usually means that the private/public key pair does not work.
 You must be able to ssh into the remote machine with this command (edit accordingly)
