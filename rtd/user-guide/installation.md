@@ -42,7 +42,7 @@ set up. Good instructions for this task can be found in this
    Edit the address to the one of the machine you want to setup,
 4. in the same directory edit the file `setup-hosts.sh`: adapt
    `--key-file=path_to_your_private_key` to point to your personal **private** key,
-5. copy your personal **public** key into `my.key`,
+5. copy your personal **public** key into `my.key.pub`,
 6. run `./setup-hosts.sh`.
 
 #### What can go wrong
