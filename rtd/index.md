@@ -42,6 +42,9 @@ in HIV-1 populations using deep sequencing data.
 - It has been tested on both Illumina MiSeq and Roche/454 sequencing reads.
 - It uses state-of-the-art third tools to filter, recalibrate, and align reads
   and to call variants.
+- Mutations above 1.5% frequency are reported, but in the
+  [paper](http://dx.doi.org/10.1016/j.jviromet.2016.11.008) we argue that mutations
+  below 5% should be treated with caution.
 - Finally, single nucleotide variants are phased at codon level and
   amino acid mutations are called and annotated.
 - Drug-resistance mutations are annotated according to

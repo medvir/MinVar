@@ -31,6 +31,12 @@ used, for example, to run
 [HIV BLAST](https://www.hiv.lanl.gov/content/sequence/BASIC_BLAST/basic_blast.html)
 from Los Alamos HIV Database.
 
+**WATCH OUT**: currently, this sequence can be longer than your sequenced
+region. The reason is that it is built by taking a consensus B sequence spanning
+the whole *pol* gene and substituting the covered positions with the sample
+consensus, without removing the B scaffold.
+An [issue](https://github.com/ozagordi/MinVar/issues/13) is already present.
+
 #### Main alignment file
 
 The alignment of (at most) 200,000 reads to the sample consensus is
