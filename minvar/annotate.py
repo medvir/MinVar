@@ -253,7 +253,7 @@ def merge_mutations(cons_muts, vcf_muts):
     cc = pd.concat([cons_muts, cc], ignore_index=True)
     cc = cc[cc.freq > 0.0]
     cc.pos = cc.pos.astype(int)
-    cc = cc.sort(columns=['pos', 'freq'], ascending=[1, 0])
+    cc = cc.sort_values(by=['pos', 'freq'], ascending=[True, False])
     return cc
 
 
@@ -349,7 +349,7 @@ def phase_mutations(muts, frame, bam_file):
     pm = pm.reset_index()
     phased_muts = pd.concat([muts, pm], ignore_index=True)
     phased_muts.pos = phased_muts.pos.astype(int)
-    phased_muts = phased_muts.sort(columns=['pos', 'freq'], ascending=[1, 0])
+    phased_muts = phased_muts.sort_values(by=['pos', 'freq'], ascending=[True, False])
     phased_muts = phased_muts.drop('index', axis=1)
     return phased_muts
 
@@ -505,7 +505,7 @@ def main(vcf_file=None, ref_file=None, bam_file=None):
     anno_muts = annotate_mutations(phased, ref_nt)
     anno_muts = anno_muts.groupby(['gene', 'pos', 'mut']).sum()
     anno_muts = anno_muts.reset_index()
-    anno_muts = anno_muts.sort(columns=['gene', 'pos', 'freq'], ascending=[1, 1, 0])
+    anno_muts = anno_muts.sort_values(by=['gene', 'pos', 'freq'], ascending=[True, True, False])
     anno_muts.to_csv('annotated_mutations.csv', sep=',', float_format='%6.4f', index=False)
 
 if __name__ == '__main__':
