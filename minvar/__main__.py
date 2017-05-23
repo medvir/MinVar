@@ -12,6 +12,8 @@ def main():
     group1 = parser.add_argument_group('Input files', 'Required input')
     group1.add_argument("-f", "--fastq", default="", type=str, dest="f",
                         help="input reads in fastq format")
+    group1.add_argument("-r", "--recal", action="store_true",
+                        help="turn on recalibration with GATK")
 
     # exit so that log file is not written
     if len(sys.argv) == 1 or sys.argv[1] == '-h' or sys.argv[1] == '--help':
@@ -31,8 +33,10 @@ def main():
     cns_file, prepared_bam = prepare.main(args.f)
 
     from minvar import callvar
-    called_file, called_bam = callvar.main(ref_file=cns_file, bamfile=prepared_bam,
-                               caller='lofreq', recalibrate=True)
+    called_file, called_bam = callvar.main(ref_file=cns_file,
+                                           bamfile=prepared_bam,
+                                           caller='lofreq',
+                                           recalibrate=args.recal)
 
     from minvar import annotate
     annotate.main(vcf_file=called_file, ref_file=cns_file, bam_file=called_bam)
