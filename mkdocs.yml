@@ -5,6 +5,8 @@ docs_dir: rtd
 pages:
     - Introduction: 'index.md'
     - User Guide:
-        - 'Installation': 'user-guide/installation.md'
-        - 'Output files': 'user-guide/output-files.md'
-    - 'License': 'license.md'
+        - Installation: 'user-guide/installation.md'
+        - Output files: 'user-guide/output-files.md'
+        - Note on recalibration: 'user-guide/recal.md'
+    - License: 'license.md'
+    - Software License Agreement: 'agreement.md'
