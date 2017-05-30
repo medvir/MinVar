@@ -23,6 +23,6 @@ and viral titers (100,000 and 10,000 copies/mL). See the paper and the file
 
 ## Geometric mix (51.6%, 25.8%, 12.9%, 6.5%, and 3.2%)
 
-![Geometric mix: 1E4 viral load](./images/scatter_plot_mix_GEO_1E4.pdf "Geometric mix 1E4")
+![Geometric mix: 1E4 viral load](../images/scatter_plot_mix_GEO_1E4.pdf "Geometric mix 1E4")
 
-![Geometric mix: 1E5 viral load](./images/scatter_plot_mix_GEO_1E5.pdf "Geometric mix 1E5")
+![Geometric mix: 1E5 viral load](../images/scatter_plot_mix_GEO_1E5.pdf "Geometric mix 1E5")
