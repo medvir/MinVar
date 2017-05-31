@@ -110,6 +110,22 @@ def recalibrate_qualities(ref_file, bamfile, platform="ILLUMINA"):
     return recalfile
 
 
+def indelqual(ref_file, bamfile):
+    '''Use lofreq indelqual to insert indel qualities into bamfile; this allows
+    calling indels and is an alternative to GATK BaseRecalibrator
+    '''
+
+    bamstem, bamext = os.path.splitext(bamfile)
+    assert bamext == '.bam', bamext
+    recalfile = '%s_recal.bam' % bamstem
+    cml = 'lofreq indelqual --dindel -f %s -o %s %s' % (ref_file, recalfile, bamfile)
+    subprocess.call(cml, shell=True)
+    # needs reindexing
+    subprocess.call('samtools index %s' % recalfile, shell=True)
+
+    return recalfile
+
+
 def call_variants(ref_file=None, bamfile=None, parallel=True, n_regions=8, caller='lofreq'):
     '''Wrapper to call lofreq (also other tools originally)'''
     bamstem, bamext = os.path.splitext(bamfile)  # '.'.join(bamfile.split('.')[:-1])
@@ -199,14 +215,18 @@ def main(ref_file=None, bamfile=None, parallel=True, n_regions=6,
     if recalibrate:
         logging.info('recalibrating base qualities')
         recalfile = recalibrate_qualities(ref_file, bamfile)
-        logging.info('calling variants with %s' % caller)
-        called_file = call_variants(ref_file, recalfile, parallel, n_regions, caller)
-        called_bam = recalfile
     else:
         logging.info('base qualities will not be recalibrated')
-        logging.info('skip to calling variants with %s' % caller)
-        called_file = call_variants(ref_file, bamfile, parallel, n_regions, caller)
-        called_bam = bamfile
+        if(caller == 'lofreq'):
+            logging.info('indel qualities introduced with lofreq')
+            recalfile = indelqual(ref_file, bamfile)
+        else:
+            logging.info('indel qualities will not be introduced')
+            recalfile = bamfile
+
+    logging.info('calling variants with %s' % caller)
+    called_file = call_variants(ref_file, recalfile, parallel, n_regions, caller)
+    called_bam = recalfile
 
     return called_file, called_bam
 
