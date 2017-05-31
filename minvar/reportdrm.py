@@ -164,7 +164,7 @@ def main(mut_file='annotated_mutations.csv', subtypes_file='subtype_evidence.csv
 
     cols = ['gene', 'pos', 'mut', 'freq', 'category']
     drms = drms[cols]
-    drms.sort(cols[:3], inplace=True)
+    drms.sort_values(cols[:3], inplace=True)
     drms.to_csv('annotated_DRM.csv', index=False)
 
     for gene in ['protease', 'RT', 'integrase']:
