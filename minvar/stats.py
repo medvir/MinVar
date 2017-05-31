@@ -4,10 +4,9 @@ import os
 import sys
 import subprocess
 
-dn = os.path.dirname(__file__)
-bed_file = os.path.join(dn, 'db/consensus_B.bed')
+bed_file = os.path.join(os.path.dirname(__file__), 'db/consensus_B.bed')
 
-def coverage_stats(bam_file):
+def coverage_stats_per_base(bam_file):
     '''Computes the coverage for the different genes by invoking
     samtools bedcov
     '''
@@ -20,6 +19,7 @@ def coverage_stats(bam_file):
             cov_per_base = float(lsp[-1]) / (int(lsp[2]) - int(lsp[1]) + 1)
             print(lsp, cov_per_base)
 
+def coverage_above_threshold(bam_file, threshold=100):
     cum_cov = {}
     cml = 'bedtools coverage -b %s -a %s -hist' % (bam_file, bed_file)
     proc = subprocess.Popen(cml, shell=True, stdout=subprocess.PIPE,
@@ -32,7 +32,7 @@ def coverage_stats(bam_file):
             region = lsp[3]
             cov_here = int(lsp[4])
             fract_at_cov = float(lsp[7])
-            if cov_here > 100:
+            if cov_here > threshold:
                 cum_cov[region] = cum_cov.get(region, 0) + fract_at_cov
     for k, v in cum_cov.items():
         print(k, v)
