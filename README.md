@@ -1,3 +1,5 @@
+[![codebeat badge](https://codebeat.co/badges/eff65e46-db50-4ad7-92ff-19a6a67bcaa2)](https://codebeat.co/projects/github-com-ozagordi-minvar-master)
+
 # MinVar: automatic detection of drug-resistance mutations in HIV-1
 
 MinVar is a command-line tool to discover mutations conferring drug resistance
