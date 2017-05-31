@@ -4,6 +4,8 @@ import os
 import sys
 import argparse
 
+from pbr.version import VersionInfo
+
 def main():
 
     # parse command line
@@ -14,6 +16,8 @@ def main():
                         help="input reads in fastq format")
     group1.add_argument("-r", "--recal", action="store_true",
                         help="turn on recalibration with GATK")
+    group1.add_argument('-v', '--version', action='version',
+                         version=str(VersionInfo('minvar')))
 
     # exit so that log file is not written
     if len(sys.argv) == 1 or sys.argv[1] == '-h' or sys.argv[1] == '--help':
