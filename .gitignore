@@ -3,3 +3,4 @@ __pycache__/
 .dropbox.attr
 ansible/setup.retry
 my.key.pub
+rtd/images/merged_truth_*csv

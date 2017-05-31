@@ -23,31 +23,31 @@ and viral titers (100,000 and 10,000 copies/mL). See the paper and the file
 
 ## Geometric mix (51.6%, 25.8%, 12.9%, 6.5%, and 3.2%)
 
-![Geometric mix: 1E4 viral load](../images/scatter_plot_mix_GEO_1E4.pdf "Geometric mix 1E4")
+![Geometric mix: 1E4 viral load](../images/scatter_plot_mix_GEO_1E4.png "Geometric mix 1E4")
 
-![Geometric mix: 1E5 viral load](../images/scatter_plot_mix_GEO_1E5.pdf "Geometric mix 1E5")
+![Geometric mix: 1E5 viral load](../images/scatter_plot_mix_GEO_1E5.png "Geometric mix 1E5")
 
 ## 20-20 mix (all five virus at 20%)
 
-![20-20 mix: 1E4 viral load](../images/scatter_plot_mix_20-20_1E4.pdf "20-20 mix 1E4")
+![20-20 mix: 1E4 viral load](../images/scatter_plot_mix_20-20_1E4.png "20-20 mix 1E4")
 
-![20-20 mix: 1E5 viral load](../images/scatter_plot_mix_20-20_1E5.pdf "20-20 mix 1E5")
+![20-20 mix: 1E5 viral load](../images/scatter_plot_mix_20-20_1E5.png "20-20 mix 1E5")
 
 ## 60-10 mix (one virus at 60%, others at 10%)
 
-![60-10 mix: 1E4 viral load](../images/scatter_plot_mix_60-10_1E4.pdf "60-10 mix 1E4")
+![60-10 mix: 1E4 viral load](../images/scatter_plot_mix_60-10_1E4.png "60-10 mix 1E4")
 
-![60-10 mix: 1E5 viral load](../images/scatter_plot_mix_60-10_1E5.pdf "60-10 mix 1E5")
+![60-10 mix: 1E5 viral load](../images/scatter_plot_mix_60-10_1E5.png "60-10 mix 1E5")
 
 
 ## 80-5 mix (one virus at 80%, others at 5%)
 
-![80-5 mix: 1E4 viral load](../images/scatter_plot_mix_80-5_1E4.pdf "80-5 mix 1E4")
+![80-5 mix: 1E4 viral load](../images/scatter_plot_mix_80-5_1E4.png "80-5 mix 1E4")
 
-![80-5 mix: 1E5 viral load](../images/scatter_plot_mix_80-5_1E5.pdf "80-5 mix 1E5")
+![80-5 mix: 1E5 viral load](../images/scatter_plot_mix_80-5_1E5.png "80-5 mix 1E5")
 
 ## 90-2.5 mix (one virus at 90%, others at 2.5%)
 
-![90-2.5 mix: 1E4 viral load](../images/scatter_plot_mix_90-2.5_1E4.pdf "90-2.5 mix 1E4")
+![90-2.5 mix: 1E4 viral load](../images/scatter_plot_mix_90-2.5_1E4.png "90-2.5 mix 1E4")
 
-![90-2.5 mix: 1E5 viral load](../images/scatter_plot_mix_90-2.5_1E5.pdf "90-2.5 mix 1E5")
+![90-2.5 mix: 1E5 viral load](../images/scatter_plot_mix_90-2.5_1E5.png "90-2.5 mix 1E5")
