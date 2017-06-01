@@ -19,8 +19,10 @@ def main():
     group1.add_argument('-v', '--version', action='version',
                          version=str(VersionInfo('minvar')))
 
+    args = parser.parse_args()
+
     # exit so that log file is not written
-    if len(sys.argv) == 1 or sys.argv[1] == '-h' or sys.argv[1] == '--help':
+    if len(sys.argv) == 1:
         parser.print_help()
         sys.exit()
 
@@ -31,7 +33,7 @@ def main():
                         format='%(levelname)s %(asctime)s %(filename)s: %(funcName)s() %(lineno)d: \t%(message)s', datefmt='%Y/%m/%d %H:%M:%S')
     logging.info(' '.join(sys.argv))
 
-    args = parser.parse_args()
+
 
     from minvar import prepare
     cns_file, prepared_bam = prepare.main(args.f)
@@ -49,7 +51,8 @@ def main():
     reportdrm.main()
 
     from minvar import stats
-    stats.coverage_stats(prepared_bam)
+    stats.coverage_stats_per_base(prepared_bam)
+    stats.coverage_above_threshold(prepared_bam)
 
 if __name__ == "__main__": #  and __package__ is None:
     main()
