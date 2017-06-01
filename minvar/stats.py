@@ -3,8 +3,9 @@
 import os
 import sys
 import subprocess
+from pkg_resources import resource_filename
 
-bed_file = os.path.join(os.path.dirname(__file__), 'db/consensus_B.bed')
+bed_file = resource_filename(__name__, 'db/consensus_B.bed')
 
 def coverage_stats_per_base(bam_file):
     '''Computes the coverage for the different genes by invoking

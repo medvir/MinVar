@@ -7,13 +7,13 @@ import subprocess
 import shutil
 import warnings
 import logging
+from pkg_resources import resource_filename
 
 from Bio import SeqIO
 
-dn = os.path.dirname(__file__)
-references_file = os.path.join(dn, 'db/HIV_cons_db')  # used to determine subtype
-hiv_ref_db = os.path.join(dn, 'db/cons_B_db')  # used to determine consensus
-def_amp = os.path.join(dn, 'db/consensus_B.fna')
+references_file = resource_filename(__name__, 'db/HIV_cons_db.nsq')
+def_amp = resource_filename(__name__, 'db/consensus_B.fna')
+
 qual_thresh = 20
 min_len = 49
 
@@ -60,8 +60,9 @@ def find_subtype(sampled_reads=1000, remote=False):
                                    universal_newlines=True)
 
     # prepare blast to subject sequences
+    ref_stem = os.path.splitext(references_file)[0]
     blast_cmline = 'blastn -task megablast -query sample_hq.fasta -outfmt 6 -num_threads %d' % min(6, CPUS)
-    blast_cmline += ' -db {} -out {}'.format(references_file, loc_hit_file)
+    blast_cmline += ' -db {} -out {}'.format(ref_stem, loc_hit_file)
     bout = subprocess.check_output(blast_cmline, shell=True,
                                    universal_newlines=True)
 

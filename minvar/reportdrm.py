@@ -6,6 +6,9 @@ import csv
 import warnings
 from pprint import pprint
 
+from pkg_resources import resource_string
+#foo_config = resource_string(__name__, 'foo.conf')
+
 import pandas as pd
 from Bio import SeqIO
 

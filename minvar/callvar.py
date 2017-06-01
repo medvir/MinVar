@@ -9,6 +9,8 @@ import pandas as pd
 
 import logging
 
+from pkg_resources import resource_filename
+
 import Bio
 from Bio import SeqIO
 from Bio.Seq import Seq
@@ -29,12 +31,10 @@ try:
 except TypeError:
     CPUS = 1
 
-# amminoacid sequences from files in db directory
-db_dir = os.path.abspath(os.path.join(dn_dir, 'db'))
-B_pol_nt = \
-    list(SeqIO.parse(os.path.join(db_dir, 'consensus_B.fna'), 'fasta'))[0]
+# nt and amminoacid sequences from files in db directory
+B_pol_nt = list(SeqIO.parse(resource_filename(__name__, 'db/consensus_B.fna'), 'fasta'))[0]
 B_pol_aa = \
-    list(SeqIO.parse(os.path.join(db_dir, 'consensus_B.faa'), 'fasta'))[0]
+    list(SeqIO.parse(resource_filename(__name__, 'db/consensus_B.faa'), 'fasta'))[0]
 
 # 64 codons + '---'
 translation_table = {
