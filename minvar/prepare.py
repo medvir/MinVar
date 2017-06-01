@@ -216,10 +216,10 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
         subprocess.call(cml, shell=True)
 
         logging.info('convert to SAM -> BAM')
-        # b2s_exe = os.path.join(dn, 'blast2sam.py')
-        b2s_exe = 'blast2sam.py'
-        cml = b2s_exe
-        cml += ' outblast.xml > refcon.sam'
+        #b2s_exe = os.path.join(dn, 'blast2sam.py')
+        #b2s_exe = 'blast2sam.py'
+        #cml = b2s_exe
+        cml = 'blast2sam outblast.xml > refcon.sam'
         subprocess.call(cml, shell=True)
 
         # reverse reads are not yet properly treated, so -F 16

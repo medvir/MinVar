@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.4
+#!/usr/bin/env python3
 
 ''' Parse Blast output in XML with Biopython and converts to SAM (v1).
 Tested with Biopython 1.64 and BLASTN 2.2.30+ command
@@ -127,13 +127,6 @@ from Bio.Blast import NCBIXML
 NOMAPQ = False
 def_qual = 'I'
 
-# Usage
-try:
-    filein = sys.argv[1]
-except KeyError:
-    sys.exit("Usage: blast2sam2.py <in+blastn>\n")
-
-
 sam_line = ['', 0, None, 0, 0, None, '*', 0, 0, '*', '*']
 
 
@@ -202,63 +195,73 @@ def cigar(subject, query, queryStart, queryEnd, querySize):
     # Join segments into a string
     return ''.join(cigar_str)
 
-# use itertools.tee() because we need the list twice
-blast_records, blast_records_backup = tee(NCBIXML.parse(open(filein)))
 
-# read once to parse general info
-version = None
-references = {}
-for record in blast_records:
-    if not version:
-        version = record.version
-        application = record.application
-    if record.alignments == []:
-        continue
-    for alignment in record.alignments:
-        references[alignment.hit_def] = alignment.length
+def main():
+    # Usage
+    try:
+        filein = sys.argv[1]
+    except KeyError:
+        sys.exit("Usage: blast2sam2.py <in+blastn>\n")
+    # use itertools.tee() because we need the list twice
+    blast_records, blast_records_backup = tee(NCBIXML.parse(open(filein)))
 
-# print header
-print('@HD\tVN:1.0\tSO:unsorted')
-for k, v in references.items():
-    print('@SQ\tSN:%s\tLN:%d' % (k, v))
-print('@PG\tID:%s\tVN:%s\tCL:%s' % (application, version, ' '.join(sys.argv)))
+    # read once to parse general info
+    version = None
+    references = {}
+    for record in blast_records:
+        if not version:
+            version = record.version
+            application = record.application
+        if record.alignments == []:
+            continue
+        for alignment in record.alignments:
+            references[alignment.hit_def] = alignment.length
 
-for record in blast_records_backup:
-    for alignment in record.alignments:
-        TC = len(alignment.hsps)  # SAM TC flag: segments in template
-        for hsp in alignment.hsps:
-            to_print = copy.copy(sam_line)
-            to_print[0] = record.query
-            to_print[2] = alignment.hit_def
-            to_print[3] = min(hsp.sbjct_start, hsp.sbjct_end)
+    # print header
+    print('@HD\tVN:1.0\tSO:unsorted')
+    for k, v in references.items():
+        print('@SQ\tSN:%s\tLN:%d' % (k, v))
+    print('@PG\tID:%s\tVN:%s\tCL:%s' % (application, version, ' '.join(sys.argv)))
 
-            try:
-                mapq = int(-log10(hsp.expect))
-            except ValueError:
-                mapq = 127
-            if mapq > 254:
-                to_print[4] = 254
-            elif mapq < 0:
-                to_print[4] = 0
-            else:
-                to_print[4] = mapq
-            if NOMAPQ:
-                to_print[4] = 255
+    for record in blast_records_backup:
+        for alignment in record.alignments:
+            TC = len(alignment.hsps)  # SAM TC flag: segments in template
+            for hsp in alignment.hsps:
+                to_print = copy.copy(sam_line)
+                to_print[0] = record.query
+                to_print[2] = alignment.hit_def
+                to_print[3] = min(hsp.sbjct_start, hsp.sbjct_end)
 
-            if hsp.frame == (1, -1):
-                to_print[1] |= 16
-                to_print[9] = Seq(hsp.query.replace('-', '')).reverse_complement()
-            elif hsp.frame == (1, 1):
+                try:
+                    mapq = int(-log10(hsp.expect))
+                except ValueError:
+                    mapq = 127
+                if mapq > 254:
+                    to_print[4] = 254
+                elif mapq < 0:
+                    to_print[4] = 0
+                else:
+                    to_print[4] = mapq
+                if NOMAPQ:
+                    to_print[4] = 255
+
+                if hsp.frame == (1, -1):
+                    to_print[1] |= 16
+                    to_print[9] = Seq(hsp.query.replace('-', '')).reverse_complement()
+                elif hsp.frame == (1, 1):
+                    to_print[9] = hsp.query.replace('-', '')
+                else:
+                    sys.exit('What strand?')
+                to_print[5] = cigar(hsp.sbjct, hsp.query, hsp.query_start,
+                                    hsp.query_end, hsp.align_length)
+
                 to_print[9] = hsp.query.replace('-', '')
-            else:
-                sys.exit('What strand?')
-            to_print[5] = cigar(hsp.sbjct, hsp.query, hsp.query_start,
-                                hsp.query_end, hsp.align_length)
+                to_print[10] = def_qual * len(to_print[9])
+                to_print = [str(t) for t in to_print]
+                print('\t'.join(to_print))
+                # print(hsp.query)
+                # print(hsp.match)
+                # print(hsp.sbjct)
 
-            to_print[9] = hsp.query.replace('-', '')
-            to_print[10] = def_qual * len(to_print[9])
-            to_print = [str(t) for t in to_print]
-            print('\t'.join(to_print))
-            # print(hsp.query)
-            # print(hsp.match)
-            # print(hsp.sbjct)
+if __name__ == '__main__':
+    main()
