@@ -4,3 +4,5 @@ __pycache__/
 ansible/setup.retry
 my.key.pub
 rtd/images/merged_truth_*csv
+.eggs/
+MinVar.egg-info/
