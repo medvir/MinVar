@@ -3,8 +3,13 @@
 import os
 import sys
 import argparse
+from pkg_resources import get_distribution, DistributionNotFound
 
-from pbr.version import VersionInfo
+try:
+    __version__ = get_distribution('minvar').version
+except DistributionNotFound:
+   # package is not installed
+   pass
 
 def main():
 
@@ -17,7 +22,7 @@ def main():
     group1.add_argument("-r", "--recal", action="store_true",
                         help="turn on recalibration with GATK")
     group1.add_argument('-v', '--version', action='version',
-                         version=str(VersionInfo('minvar')))
+                         version=__version__)
 
     args = parser.parse_args()
 
