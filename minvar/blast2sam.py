@@ -196,6 +196,45 @@ def cigar(subject, query, queryStart, queryEnd, querySize):
     return ''.join(cigar_str)
 
 
+def print_sam_entry(record, alignment, hsp):
+    """
+    """
+    to_print = copy.copy(sam_line)
+    to_print[0] = record.query
+    to_print[2] = alignment.hit_def
+    to_print[3] = min(hsp.sbjct_start, hsp.sbjct_end)
+
+    try:
+        mapq = int(-log10(hsp.expect))
+    except ValueError:
+        mapq = 127
+    if mapq > 254:
+        to_print[4] = 254
+    elif mapq < 0:
+        to_print[4] = 0
+    else:
+        to_print[4] = mapq
+    if NOMAPQ:
+        to_print[4] = 255
+
+    if hsp.frame == (1, -1):
+        to_print[1] |= 16
+        to_print[9] = Seq(hsp.query.replace('-', '')).reverse_complement()
+    elif hsp.frame == (1, 1):
+        to_print[9] = hsp.query.replace('-', '')
+    else:
+        sys.exit('What strand?')
+    to_print[5] = cigar(hsp.sbjct, hsp.query, hsp.query_start,
+                        hsp.query_end, hsp.align_length)
+
+    to_print[9] = hsp.query.replace('-', '')
+    to_print[10] = def_qual * len(to_print[9])
+    to_print = [str(t) for t in to_print]
+    print('\t'.join(to_print))
+    # print(hsp.query)
+    # print(hsp.match)
+    # print(hsp.sbjct)
+
 def main():
     # Usage
     try:
@@ -227,41 +266,8 @@ def main():
         for alignment in record.alignments:
             TC = len(alignment.hsps)  # SAM TC flag: segments in template
             for hsp in alignment.hsps:
-                to_print = copy.copy(sam_line)
-                to_print[0] = record.query
-                to_print[2] = alignment.hit_def
-                to_print[3] = min(hsp.sbjct_start, hsp.sbjct_end)
+                print_sam_entry(record, alignment, hsp)
 
-                try:
-                    mapq = int(-log10(hsp.expect))
-                except ValueError:
-                    mapq = 127
-                if mapq > 254:
-                    to_print[4] = 254
-                elif mapq < 0:
-                    to_print[4] = 0
-                else:
-                    to_print[4] = mapq
-                if NOMAPQ:
-                    to_print[4] = 255
-
-                if hsp.frame == (1, -1):
-                    to_print[1] |= 16
-                    to_print[9] = Seq(hsp.query.replace('-', '')).reverse_complement()
-                elif hsp.frame == (1, 1):
-                    to_print[9] = hsp.query.replace('-', '')
-                else:
-                    sys.exit('What strand?')
-                to_print[5] = cigar(hsp.sbjct, hsp.query, hsp.query_start,
-                                    hsp.query_end, hsp.align_length)
-
-                to_print[9] = hsp.query.replace('-', '')
-                to_print[10] = def_qual * len(to_print[9])
-                to_print = [str(t) for t in to_print]
-                print('\t'.join(to_print))
-                # print(hsp.query)
-                # print(hsp.match)
-                # print(hsp.sbjct)
 
 if __name__ == '__main__':
     main()
