@@ -5,6 +5,7 @@ import setuptools
 setuptools.setup(
     use_scm_version=True,
     setup_requires=['setuptools_scm', 'setuptools_scm_git_archive'],
+    install_requires=['setuptools_scm'],
     name='MinVar',
       description='Minority variants in HIV',
       url='https://github.com/ozagordi/MinVar',
