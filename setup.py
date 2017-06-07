@@ -6,7 +6,6 @@ setuptools.setup(
     use_scm_version=True,
     setup_requires=['setuptools_scm', 'setuptools_scm_git_archive'],
     name='MinVar',
-      #version='1.0',
       description='Minority variants in HIV',
       url='https://github.com/ozagordi/MinVar',
       author='Osvaldo Zagordi',

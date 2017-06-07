@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
 
-import os
-import sys
-import argparse
-from pkg_resources import get_distribution, DistributionNotFound
-
-try:
-    __version__ = get_distribution('minvar').version
-except DistributionNotFound:
-   # package is not installed
-   pass
-
 def main():
+
+    import sys
+    import argparse
+    from setuptools_scm import get_version
+
+    __version__ = get_version(root='..', relative_to=__file__)
 
     # parse command line
     parser = argparse.ArgumentParser()
