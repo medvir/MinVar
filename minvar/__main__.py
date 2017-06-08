@@ -6,7 +6,14 @@ def main():
     import argparse
     from setuptools_scm import get_version
 
-    __version__ = get_version(root='..', relative_to=__file__)
+    from pkg_resources import get_distribution, DistributionNotFound
+    try:
+        __version__ = get_distribution('minvar').version
+    except DistributionNotFound:
+       # package is not installed
+       pass
+
+    #__version__ = get_version(root='..', relative_to=__file__)
 
     # parse command line
     parser = argparse.ArgumentParser()
