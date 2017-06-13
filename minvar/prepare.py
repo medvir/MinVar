@@ -172,7 +172,7 @@ def phase_variants(reffile, varfile):
         ref, alt = lsp[3:5]
         infos = dict(a.split('=') for a in lsp[7].split(';'))
         varlen = len(ref)
-        assert str(refseq.seq)[pos - 1:pos - 1 + varlen] == ref, str(refseq.seq)[pos - 1:pos - 1 + varlen]
+        assert str(refseq.seq)[pos - 1:pos - 1 + varlen] == ref, '%s instead of %s at pos %d' % (str(refseq.seq)[pos - 1:pos - 1 + varlen], ref, pos)
         # exclude multiallelic positions
         nalleles = len(alt.split(','))
         assert nalleles == 1
