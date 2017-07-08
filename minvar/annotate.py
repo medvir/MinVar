@@ -285,7 +285,7 @@ def phase_mutations(muts, frame, bam_file):
         # if in frame, save with mean frequency
         elif len(del_muts) == 3:
             freq_here = sum(del_muts.freq) / 3
-            wt_codon = ''.join(del_muts.sort('pos').wt)
+            wt_codon = ''.join(del_muts.sort_values(by='pos').wt)
             print('deletion detected: %s%d-' % (wt_codon, i))
             d_here = {'wt': wt_codon, 'pos': i, 'mut': '---', 'freq': freq_here}
             pm = pm.append(d_here, ignore_index=True)
@@ -303,7 +303,7 @@ def phase_mutations(muts, frame, bam_file):
         elif len(ins_muts) == 3:
             print('insertion detected at pos:%s' % i)
             freq_here = sum(ins_muts.freq) / 3
-            mut_codon = ''.join(ins_muts.sort('pos').mut)
+            mut_codon = ''.join(ins_muts.sort_values(by='pos').mut)
             d_here = {'wt': '---', 'pos': i, 'mut': mut_codon, 'freq': freq_here}
             pm = pm.append(d_here, ignore_index=True)
             # target is anyway appended to check the non indel mutations
