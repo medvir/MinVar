@@ -1,9 +1,11 @@
+[![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat-square)](http://bioconda.github.io/recipes/minvar/README.html)
 [![codebeat badge](https://codebeat.co/badges/eff65e46-db50-4ad7-92ff-19a6a67bcaa2)](https://codebeat.co/projects/github-com-ozagordi-minvar-master)
+
 
 # MinVar: automatic detection of drug-resistance mutations in HIV-1
 
 MinVar is a command-line tool to discover mutations conferring drug resistance
-in HIV-1 populations using deep sequencing data.
+in HIV-1 and HCV populations using deep sequencing data.
 
 ----
 
@@ -46,7 +48,7 @@ in HIV-1 populations using deep sequencing data.
   and to call variants.
 - Finally, single nucleotide variants are phased at codon level and
   amino acid mutations are called and annotated.
-- Drug-resistance mutations are annotated according to
+- HIV-1 drug-resistance mutations are annotated according to
   [Stanford HIV Drug Resistance Database (HIVDB)](https://hivdb.stanford.edu).
 - The annotated mutations are saved in a csv file (see example above) and also
   included in a report in markdown format that is finally converted to PDF.
@@ -57,7 +59,7 @@ See the official [documentation](http://minvar.readthedocs.io/en/latest/).
 
 #### Citation
 
-MinVar has been introduced and validated in  
+MinVar (version 1, HIV-1 support only) has been introduced and validated in  
 Huber, Metzner _et al._, (2017) MinVar: A rapid and versatile tool for HIV-1
 drug resistance genotyping by deep sequencing _Journal of virological methods_
 240:7-13, [doi:10.1016/j.jviromet.2016.11.008](http://dx.doi.org/10.1016/j.jviromet.2016.11.008)
