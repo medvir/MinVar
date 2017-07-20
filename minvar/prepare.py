@@ -3,6 +3,8 @@
 import os
 import os.path
 import sys
+import gzip
+import shlex
 import subprocess
 import shutil
 import warnings
@@ -15,14 +17,34 @@ references_file = resource_filename(__name__, 'db/HIV_cons_db.nsq')
 def_amp = resource_filename(__name__, 'db/consensus_B.fna')
 
 qual_thresh = 20
-min_len = 49
 
 try:
     CPUS = max(1, os.cpu_count())
 except TypeError:
     CPUS = 1
 
-def filter_reads(filename, max_n):
+
+def compute_min_len(filename):
+    ''' Estimate distribution of sequence length and find a reasonable minimum
+    length.
+    '''
+    from Bio.SeqIO.QualityIO import FastqGeneralIterator
+    logging.info('Read input file to record lengths')
+    if filename.endswith('.gz'):
+        with gzip.open(filename, 'rt') as handle:
+            reads_len = [len(s) for (n, s, q) in FastqGeneralIterator(handle)]
+    else:
+        with open(filename, 'r') as handle:
+            reads_len = [len(s) for (n, s, q) in FastqGeneralIterator(handle)]
+
+    reads_len = sorted(reads_len)
+    n = len(reads_len)
+    percentile_5 = reads_len[int(0.05 * n)]
+    logging.info('5th percentile: %d' % percentile_5)
+    return percentile_5 - 2
+
+
+def filter_reads(filename, max_n, min_len=49):
     '''Use seqtk and Biopython to trim and filter low quality reads'''
     from Bio.SeqIO.QualityIO import FastqGeneralIterator
 
@@ -116,14 +138,15 @@ def find_subtype(sampled_reads=1000, remote=False):
 def align_reads(ref=None, reads=None, out_file=None, mapper='bwa'):
     '''Align all high quality reads to found reference with smalt,
     convert and sort with samtools'''
+
     if mapper == 'smalt':
-        cml = 'smalt index -k 7 -s 2 cnsref %s' % ref
-        subprocess.call(cml, shell=True)
+        cml = 'smalt index -k 7 -s 2 cnsref %s' % shlex.quote(ref)
+        subprocess.call(shlex.split(cml))
         cml = 'smalt map -n %d -o hq_2_cons.sam -x -c 0.8 -y 0.8 cnsref %s' % (min(12, CPUS), reads)
-        subprocess.call(cml, shell=True)
+        subprocess.call(shlex.split(cml))
     elif mapper == 'bwa':
-        cml = 'bwa index -p cnsref %s' % ref
-        subprocess.call(cml, shell=True)
+        cml = 'bwa index -p cnsref %s' % shlex.quote(ref)
+        subprocess.call(shlex.split(cml))
         cml = 'bwa mem -t %d -O 12 cnsref %s > hq_2_cons.sam' % (min(12, CPUS), reads)
         subprocess.call(cml, shell=True)
     elif mapper == 'novo':
@@ -164,27 +187,28 @@ def phase_variants(reffile, varfile):
     reflist = list(str(refseq.seq))
     reflist.insert(0, '')
 
-    for l in open(varfile):
-        if l.startswith('#'):
-            continue
-        lsp = l.split('\t')
-        pos = int(lsp[1])
-        ref, alt = lsp[3:5]
-        infos = dict(a.split('=') for a in lsp[7].split(';'))
-        varlen = len(ref)
-        assert str(refseq.seq)[pos - 1:pos - 1 + varlen] == ref, '%s instead of %s at pos %d' % (str(refseq.seq)[pos - 1:pos - 1 + varlen], ref, pos)
-        # exclude multiallelic positions
-        nalleles = len(alt.split(','))
-        assert nalleles == 1
-        # reference and alternate frequency
-        freqs = 1. - float(infos['AF']), float(infos['AF'])
+    with open(varfile) as h:
+        for l in h:
+            if l.startswith('#'):
+                continue
+            lsp = l.split('\t')
+            pos = int(lsp[1])
+            ref, alt = lsp[3:5]
+            infos = dict(a.split('=') for a in lsp[7].split(';'))
+            varlen = len(ref)
+            assert str(refseq.seq)[pos - 1:pos - 1 + varlen] == ref, '%s instead of %s at pos %d' % (str(refseq.seq)[pos - 1:pos - 1 + varlen], ref, pos)
+            # exclude multiallelic positions
+            nalleles = len(alt.split(','))
+            assert nalleles == 1
+            # reference and alternate frequency
+            freqs = 1. - float(infos['AF']), float(infos['AF'])
 
-        if freqs[0] < 0.5:
-            report = alt
-        else:
-            report = ref
-        for i, r in enumerate(report):
-            reflist[pos + i] = r
+            if freqs[0] < 0.5:
+                report = alt
+            else:
+                report = ref
+            for i, r in enumerate(report):
+                reflist[pos + i] = r
 
     finalrefseq = ''.join(reflist)
     fs = SeqRecord(Seq(finalrefseq), id='sample_cons_Pol', description='lofreq')
@@ -197,6 +221,7 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
     '''Take reads, align to reference, return consensus file'''
     import glob
     import time
+    import shlex
 
     pf = time.perf_counter()
     ranseed = int(str(pf).split('.')[1][-5:])
@@ -226,16 +251,22 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
 
     elif mapper == 'bwa':
         logging.info('mapping reads with bwa')
-        cml = 'bwa index -p tmpref %s' % ref_file
-        subprocess.call(cml, shell=True)
-        cml = 'bwa mem -t %d -O 12 tmpref hq_smp.fastq > refcon.sam' % min(CPUS, 12)
-        subprocess.call(cml, shell=True)
+        cml = 'bwa index -p tmpref %s' % shlex.quote(ref_file)
+        subprocess.call(shlex.split(cml))
+
+        cml = shlex.split('bwa mem -t %d -O 12 tmpref hq_smp.fastq' % min(CPUS, 12))
+        with open('refcon.sam', 'w') as f:
+            subprocess.call(cml, stdout=f)
+
         logging.debug('remove index files')
         for biw in glob.glob('tmpref.*'):
             os.remove(biw)
         logging.debug('SAM -> BAM -> SORT')
-        cml = 'samtools view -u refcon.sam | samtools sort -T /tmp -@ %d -o refcon_sorted.bam' % min(6, CPUS)
-        subprocess.call(cml, shell=True)
+        cml1 = shlex.split('samtools view -u refcon.sam')
+        view = subprocess.Popen(cml1, stdout=subprocess.PIPE)
+        cml2 = shlex.split('samtools sort -T /tmp -@ %d -o refcon_sorted.bam' % min(6, CPUS))
+        sort = subprocess.check_output(cml2, stdin=view.stdout)
+        view.wait()
 
     elif mapper == 'novo':
         logging.info('mapping with novoalign')
@@ -245,9 +276,9 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
         subprocess.call(cml, shell=True)
         os.remove('tmpref.ndx')
 
-    os.remove('refcon.sam')
-    cml = 'samtools index refcon_sorted.bam'
-    subprocess.call(cml, shell=True)
+    #os.remove('refcon.sam')
+    cml = shlex.split('samtools index refcon_sorted.bam')
+    subprocess.call(cml)
 
     if cons_caller == 'bcftools':
         logging.info('mpileup and consensus with bcftools consensus (v1.2 required)')
@@ -275,10 +306,17 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
 
     elif cons_caller == 'own':
         logging.info('applying variants to consensus')
-        cml = 'samtools faidx %s' % ref_file
-        subprocess.call(cml, shell=True)
-        cml = 'lofreq call-parallel --pp-threads %d -f %s refcon_sorted.bam -o calls.vcf' % (min(CPUS, 6), ref_file)
-        subprocess.call(cml, shell=True)
+        # we need to copy the ref_file locally because lofreq parallel does
+        # not quote filenames and fails with sapces/parentheses
+        shutil.copy(ref_file, '.')
+        local_ref = os.path.split(ref_file)[1]
+
+        cml = shlex.split('samtools faidx %s' % local_ref)
+        subprocess.call(cml)
+
+        cml = 'lofreq call-parallel --pp-threads %d -f %s refcon_sorted.bam -o calls.vcf' % (min(CPUS, 6), local_ref)
+        subprocess.call(shlex.split(cml))
+
         phase_variants(ref_file, 'calls.vcf')
         cml = 'bgzip -f calls.vcf'
         subprocess.call(cml, shell=True)
@@ -286,15 +324,71 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
     os.rename('tmp_cns.fasta', out_file)
     return out_file
 
+
+def iterate_consensus(reads_file, ref_file=def_amp):
+    ''' Call make_consensus until convergence or for a maximum number of
+    iterations
+    '''
+
+    logging.info('First consensus iteration')
+    iteration = 1
+    # consensus from first round is saved into cns_1.fasta
+    cns_file_1 = make_consensus(ref_file, reads_file,
+                                out_file = 'cns_%d.fasta' % iteration,
+                                sampled_reads=50000, mapper='bwa')
+    try:
+        os.rename('calls.vcf.gz', 'calls_%d.vcf.gz' % iteration)
+    except FileNotFoundError:
+        loggin.info('No variants found in making consensus')
+    dh = compute_dist('cns_%d.fasta' % iteration, def_amp)
+    logging.info('distance is %6.4f' % dh)
+
+    if dh < 5:
+        logging.info('Converged at first step')
+        return cns_file_1
+
+    while iteration <= 10:
+        logging.info('iteration %d' % (iteration + 1))
+        # use cns_1.fasta for further consensus rounds
+        new_cons = make_consensus('cns_%d.fasta' % iteration, reads_file,
+                                  out_file='cns_%d.fasta' % (iteration + 1),
+                                  sampled_reads=50000, mapper='bwa')
+        try:
+            os.rename('calls.vcf.gz', 'calls_%d.vcf.gz' % (iteration + 1))
+        except FileNotFoundError:
+            loggin.info('No variants found in making consensus')
+        assert new_cons == 'cns_%d.fasta' % (iteration + 1)
+        iteration += 1
+        dh = compute_dist('cns_%d.fasta' % iteration, new_cons)
+        logging.info('distance is %6.4f' % dh)
+        if dh < 5:
+            logging.info('converged!')
+            break
+
+    return new_cons
+
+
+def compute_dist(file1, file2):
+    cml = 'blastn -query %s -subject %s -out pair.tsv -outfmt "6 qseqid sseqid pident"' % (shlex.quote(file1), shlex.quote(file2))
+
+    subprocess.call(cml, shell=True)
+    with open('pair.tsv') as h:
+        for l in h:
+            ident = l.split('\t')[-1]
+    return 100 - float(ident)
+
+
 def main(read_file=None, max_n_reads=200000):
     assert os.path.exists(read_file), 'File %s not found' % read_file
 
-    # locally defined filter_reads writes reads into high_quality.fastq
-    filtered_file = filter_reads(read_file, max_n_reads)
+    min_len = compute_min_len(read_file)
 
-    # consensus from first round is saved into cns_1.fasta
-    cns_file_1 = make_consensus(def_amp, filtered_file, out_file = 'cns_1.fasta',
-                              sampled_reads=1000, mapper='blast')
+    # locally defined filter_reads writes reads into high_quality.fastq
+    filtered_file = filter_reads(read_file, max_n_reads, min_len)
+
+    cns_file = iterate_consensus(filtered_file)
+
+
     try:
         os.rename('calls.vcf.gz', 'calls_1.vcf.gz')
     except FileNotFoundError:

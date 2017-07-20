@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import shlex
+from pprint import pprint
 import subprocess
 
 '''' Download ref sequences from ICTV maintained file
@@ -27,7 +27,7 @@ for k, v in acc_numbers.items():
     for n in v:
         acc_list.append(n)
         genotype[n] = k
-print(genotype)
+pprint(genotype)
 
 cml = 'efetch -db nuccore -format fasta -id \"%s\" > HCV_ref.fasta' % ','.join(acc_list)
 #subprocess.call(cml, shell=True)
