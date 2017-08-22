@@ -12,6 +12,7 @@ sys.modules["minvar"] = mod
 
 from minvar.prepare import compute_min_len, filter_reads, iterate_consensus
 
+
 class Test_compute_min_len(unittest.TestCase):
 
     def setUp(self):
@@ -29,8 +30,7 @@ class Test_compute_min_len(unittest.TestCase):
 
     def test_iterate_consensus(self):
         cons = iterate_consensus(self.fastq_sample)
-
-
+        self.assertIsInstance(cons, str)
 
 
 if __name__ == '__main__':

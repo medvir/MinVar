@@ -386,17 +386,9 @@ def main(read_file=None, max_n_reads=200000):
     # locally defined filter_reads writes reads into high_quality.fastq
     filtered_file = filter_reads(read_file, max_n_reads, min_len)
 
+    find_subtype()
+
     cns_file = iterate_consensus(filtered_file)
-
-
-    try:
-        os.rename('calls.vcf.gz', 'calls_1.vcf.gz')
-    except FileNotFoundError:
-        logging.info('No variants found in making consensus')
-
-    # use cns_1.fasta for a second consensus round
-    cns_file_2 = make_consensus(cns_file_1, filtered_file, out_file='cns_2.fasta',
-                                sampled_reads=20000, mapper='bwa')
 
     # change sequence name to sample_cons, remove old file
     cml = 'sed -e \'s/CONSENSUS_B/sample_cons_Pol/\' cns_2.fasta > cns_final.fasta'
@@ -405,7 +397,6 @@ def main(read_file=None, max_n_reads=200000):
     cml = 'samtools faidx cns_final.fasta'
     subprocess.call(cml, shell=True)
 
-    find_subtype()
 
     prepared_file = align_reads(ref='cns_final.fasta', reads=filtered_file, out_file='hq_2_cns_final.bam')
 
