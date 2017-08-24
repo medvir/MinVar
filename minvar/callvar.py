@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 '''Calls lofreq to produce a vcf file'''
 
-import sys
-import subprocess
 import os
+import sys
+import shlex
 import warnings
+import subprocess
 import pandas as pd
 
 import logging
@@ -32,9 +33,9 @@ except TypeError:
     CPUS = 1
 
 # nt and amminoacid sequences from files in db directory
-B_pol_nt = list(SeqIO.parse(resource_filename(__name__, 'db/consensus_B.fna'), 'fasta'))[0]
-B_pol_aa = \
-    list(SeqIO.parse(resource_filename(__name__, 'db/consensus_B.faa'), 'fasta'))[0]
+#B_pol_nt = list(SeqIO.parse(resource_filename(__name__, 'db/consensus_B.fna'), 'fasta'))[0]
+#B_pol_aa = \
+#    list(SeqIO.parse(resource_filename(__name__, 'db/consensus_B.faa'), 'fasta'))[0]
 
 # 64 codons + '---'
 translation_table = {
@@ -67,44 +68,45 @@ def recalibrate_qualities(ref_file, bamfile, platform="ILLUMINA"):
         logging.debug('file %s exists, not overwriting it' % recalfile)
         return recalfile
     # count mapped reads
-    cml = "samtools view -c -F 4 %s" % bamfile
-    mapped_reads = int(subprocess.check_output(cml, shell=True))
+    cml = shlex.split("samtools view -c -F 4 %s" % bamfile)
+    mapped_reads = int(subprocess.check_output(cml))
 
     # sample 10k reads and run lofreq to detect high confidence variants
     fraction_needed = min(1.0, round(float(10000) / mapped_reads, 3))
-    cml = 'samtools view -s %f -F 4 -h -b -o subsampled.bam %s' % (fraction_needed, bamfile)
-    subprocess.call(cml, shell=True)
-    cml = 'samtools index subsampled.bam'
-    subprocess.call(cml, shell=True)
+    cml = shlex.split('samtools view -s %f -F 4 -h -b -o subsampled.bam %s' % (fraction_needed, bamfile))
+    subprocess.call(cml)
+    cml = shlex.split('samtools index subsampled.bam')
+    subprocess.call(cml)
 
-    cml = 'lofreq call-parallel --pp-threads %d -f %s -o tmp.vcf subsampled.bam' % (min(6, CPUS), ref_file)
-    subprocess.call(cml, shell=True)
-    cml = 'lofreq filter -v 200 -V 2000 -a 0.40 -i tmp.vcf -o known.vcf'
-    subprocess.call(cml, shell=True)
+    cml = shlex.split('lofreq call-parallel --pp-threads %d -f %s -o tmp.vcf subsampled.bam' % (min(6, CPUS), ref_file))
+    subprocess.call(cml)
+    cml = shlex.split('lofreq filter -v 200 -V 2000 -a 0.40 -i tmp.vcf -o known.vcf')
+    subprocess.call(cml)
     os.remove('tmp.vcf')
 
     # need to add group information to reads
     print("@RG\tID:minvar\tSM:haploid\tLB:ga\tPL:%s" % platform, file=open('rg.txt', 'w'))
-    cml = "samtools view -h %s |  cat rg.txt - | " % bamfile
-    cml += "awk '{ if (substr($1,1,1)==\"@\") print; else printf \"%s\\tRG:Z:minvar\\n\",$0; }' | "
-    cml += "samtools view -u - > grouped.bam"
-    subprocess.call(cml, shell=True)
+    cml_s = "samtools view -h %s |  cat rg.txt - | " % bamfile
+    cml_s += "awk '{ if (substr($1,1,1)==\"@\") print; else printf \"%s\\tRG:Z:minvar\\n\",$0; }' | "
+    cml_s += "samtools view -u - > grouped.bam"
+    subprocess.call(cml_s, shell=True)
     os.remove('rg.txt')
-    cml = 'samtools index grouped.bam'
-    subprocess.call(cml, shell=True)
+    cml = shlex.split('samtools index grouped.bam')
+    subprocess.call(cml)
 
     refstem = os.path.splitext(ref_file)[0]
-    cml = 'java -jar /usr/local/picard-tools/picard.jar CreateSequenceDictionary R=%s O=%s.dict' % (ref_file, refstem)
-    subprocess.call(cml, shell=True)
+    cml = shlex.split('java -jar /usr/local/picard-tools/picard.jar CreateSequenceDictionary R=%s O=%s.dict' % (ref_file, refstem))
+    subprocess.call(cml)
 
     # first pass to parse features
-    cml = 'java -jar /usr/local/GATK/GenomeAnalysisTK.jar -T BaseRecalibrator --maximum_cycle_value 600'
-    cml += ' -I grouped.bam -l INFO -R %s -o recal_data.grp -knownSites known.vcf' % ref_file
-    subprocess.call(cml, shell=True)
+    cml_s = 'java -jar /usr/local/GATK/GenomeAnalysisTK.jar -T BaseRecalibrator --maximum_cycle_value 600'
+    cml_s += ' -I grouped.bam -l INFO -R %s -o recal_data.grp -knownSites known.vcf' % ref_file
+    cml = shlex.split(cml_s)
+    subprocess.call(cml)
 
     # second pass to recalibrate
-    cml = 'java -jar /usr/local/GATK/GenomeAnalysisTK.jar -T PrintReads'
-    cml += ' -R %s -I grouped.bam -BQSR recal_data.grp -o %s' % (ref_file, recalfile)
+    cml_s = 'java -jar /usr/local/GATK/GenomeAnalysisTK.jar -T PrintReads'
+    cml_s += ' -R %s -I grouped.bam -BQSR recal_data.grp -o %s' % (ref_file, recalfile)
     subprocess.call(cml, shell=True)
 
     return recalfile
@@ -118,10 +120,10 @@ def indelqual(ref_file, bamfile):
     bamstem, bamext = os.path.splitext(bamfile)
     assert bamext == '.bam', bamext
     recalfile = '%s_recal.bam' % bamstem
-    cml = 'lofreq indelqual --dindel -f %s -o %s %s' % (ref_file, recalfile, bamfile)
-    subprocess.call(cml, shell=True)
+    cml = shlex.split('lofreq indelqual --dindel -f %s -o %s %s' % (ref_file, recalfile, bamfile))
+    subprocess.call(cml)
     # needs reindexing
-    subprocess.call('samtools index %s' % recalfile, shell=True)
+    subprocess.call(shlex.split('samtools index %s' % recalfile))
 
     return recalfile
 
@@ -132,8 +134,8 @@ def call_variants(ref_file=None, bamfile=None, parallel=True, n_regions=8, calle
     assert bamext == '.bam', bamfile + bamext
 
     # index reference
-    cml = 'samtools faidx %s' % ref_file
-    subprocess.call(cml, shell=True)
+    cml = shlex.split('samtools faidx %s' % ref_file)
+    subprocess.call(cml)
 
     # call minority variants with freebayes, lofreq or samtools/bcftools
 
@@ -168,12 +170,12 @@ def call_variants(ref_file=None, bamfile=None, parallel=True, n_regions=8, calle
 
     # lofreq here
     elif parallel and caller == 'lofreq':
-        cml = 'lofreq call-parallel --pp-threads %d --call-indels -f %s -o tmp.vcf %s' % \
-            (min(6, CPUS), ref_file, bamfile)
-        subprocess.call(cml, shell=True)
+        cml = shlex.split('lofreq call-parallel --pp-threads %d --call-indels -f %s -o tmp.vcf %s' % \
+            (min(6, CPUS), ref_file, bamfile))
+        subprocess.call(cml)
     elif not parallel and caller == 'lofreq':
-        cml = 'lofreq call -f %s -o tmp.vcf %s' % (ref_file, bamfile)
-        subprocess.call(cml, shell=True)
+        cml = shlex.split('lofreq call -f %s -o tmp.vcf %s' % (ref_file, bamfile))
+        subprocess.call(cml)
 
     # samtools here
     elif caller == 'samtools':
@@ -193,9 +195,9 @@ def call_variants(ref_file=None, bamfile=None, parallel=True, n_regions=8, calle
 
     # lofreq still needs filtering
     if caller == 'lofreq':
-        cml = 'lofreq filter -i tmp.vcf -o %s.vcf -v %d -a %f' % \
-            (bamstem, RAW_DEPTH_THRESHOLD, MIN_FRACTION)
-        subprocess.call(cml, shell=True)
+        cml = shlex.split('lofreq filter -i tmp.vcf -o %s.vcf -v %d -a %f' % \
+            (bamstem, RAW_DEPTH_THRESHOLD, MIN_FRACTION))
+        subprocess.call(cml)
         return '%s.vcf' % bamstem
 
 
@@ -203,6 +205,8 @@ def main(ref_file=None, bamfile=None, parallel=True, n_regions=6,
          caller='lofreq', recalibrate=True):
     '''What does a main do?'''
 
+    ref_file = shlex.quote(ref_file)
+    bamfile = shlex.quote(bamfile)
     # call variants
     bamstem, bamext = os.path.splitext(bamfile)
     assert bamext == '.bam', bamext
