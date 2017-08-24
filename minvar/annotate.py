@@ -318,7 +318,7 @@ def phase_mutations(muts, frame, bam_file):
     for t in targets:
         haps = {}
         coverage = 0
-        cml = 'samtools view %s sample_cons_Pol:%d-%d' % (bam_file, t[0], t[1])
+        cml = 'samtools view %s phased:%d-%d' % (bam_file, t[0], t[1])
         proc = subprocess.Popen(cml, shell=True, stdout=subprocess.PIPE,
                                 universal_newlines=True)
         with proc.stdout as handle:
