@@ -209,6 +209,7 @@ def needle_align(a_seq, b_seq, out_file, go=GO, ge=GE,
     """ Does not require cmline, neither from Biopython,
         nor from pythonlib
     """
+    import shlex
     import subprocess
     Verbose = False
 
@@ -223,7 +224,7 @@ def needle_align(a_seq, b_seq, out_file, go=GO, ge=GE,
     if os.path.exists(out_file):
         return out_file, 'exists'
     try:
-        retcode = subprocess.call(line1, shell=True)
+        retcode = subprocess.call(shlex.split(line1))  # , shell=True)
         if retcode < 0:
             if Verbose:
                 print("'%s'" % line1, file=sys.stderr)
