@@ -56,9 +56,10 @@ def main():
     from minvar import reportdrm
     reportdrm.main(org_found)
 
-    from minvar import stats
-    stats.coverage_stats_per_base(prepared_bam)
-    stats.coverage_above_threshold(prepared_bam)
+    if org_found == 'HIV':
+        from minvar import stats
+        stats.coverage_stats_per_base(prepared_bam)
+        stats.coverage_above_threshold(prepared_bam)
 
 if __name__ == "__main__": #  and __package__ is None:
     main()

@@ -81,7 +81,7 @@ def compute_min_len(filename):
     reads_len = sorted(reads_len)
     n = len(reads_len)
     percentile_5 = reads_len[int(0.05 * n)]
-    logging.info('5th percentile: %d' % percentile_5)
+    logging.info('5th percentile: %d', percentile_5)
     return percentile_5 - 2
 
 
@@ -125,10 +125,12 @@ def find_subtype(reads_file, sampled_reads=1000):
         to_fasta = subprocess.Popen(cml2, stdin=sample.stdout, stdout=oh)
         sample.stdout.close()
         output = to_fasta.communicate()[0]
+    del output
     oh.close()
 
     # prepare blast to subject sequences
-    blast_cmline = 'blastn -task megablast -query sample_hq.fasta -outfmt 6'  # -num_threads %d' % min(6, CPUS)
+    blast_cmline = 'blastn -task megablast -query sample_hq.fasta -outfmt 6'
+    # -num_threads %d' % min(6, CPUS)
     blast_cmline += ' -subject {} -out {}'.format(shlex.quote(references_file),
                                                   loc_hit_file)
     blast = subprocess.Popen(shlex.split(blast_cmline), universal_newlines=True)
@@ -193,20 +195,25 @@ def align_reads(ref=None, reads=None, out_file=None, mapper='bwa'):
     if mapper == 'smalt':
         cml = 'smalt index -k 7 -s 2 cnsref %s' % shlex.quote(ref)
         subprocess.call(shlex.split(cml))
-        cml = 'smalt map -n %d -o hq_2_cons.sam -x -c 0.8 -y 0.8 cnsref %s' % (min(12, CPUS), reads)
+        cml = 'smalt map -n %d -o hq_2_cons.sam -x -c 0.8 -y 0.8 cnsref %s' %\
+            (min(12, CPUS), reads)
         subprocess.call(shlex.split(cml))
     elif mapper == 'bwa':
         cml = 'bwa index -p cnsref %s' % shlex.quote(ref)
         subprocess.call(shlex.split(cml))
-        cml = 'bwa mem -t %d -O 12 cnsref %s > hq_2_cons.sam' % (min(12, CPUS), reads)
+        cml = 'bwa mem -t %d -O 12 cnsref %s > hq_2_cons.sam' %\
+            (min(12, CPUS), reads)
         subprocess.call(cml, shell=True)
     elif mapper == 'novo':
         cml = 'novoindex cnsref.ndx %s' % ref
         subprocess.call(cml, shell=True)
-        cml = 'novoalign -d cnsref.ndx -f %s -F STDFQ -o SAM > hq_2_cons.sam' % reads
+        cml = 'novoalign -d cnsref.ndx -f %s -F STDFQ -o SAM > hq_2_cons.sam' %\
+            reads
         subprocess.call(cml, shell=True)
 
-    cml = 'samtools view -Su hq_2_cons.sam | samtools sort -T /tmp -@ %d -o %s -' % (min(4, CPUS), out_file)
+    cml = \
+        'samtools view -Su hq_2_cons.sam | samtools sort -T /tmp -@ %d -o %s -'\
+            % (min(4, CPUS), out_file)
     subprocess.call(cml, shell=True)
     cml = 'samtools index %s' % out_file
     subprocess.call(cml, shell=True)
@@ -222,11 +229,11 @@ def phase_variants(reffile, varfile):
 
     from Bio.Seq import Seq
     from Bio.SeqRecord import SeqRecord
-    from Bio.Alphabet import generic_dna
+    # from Bio.Alphabet import generic_dna
 
-    # wobble = {'AG': 'R', 'CT': 'Y', 'AC': 'M', 'GT': 'K', 'CG': 'S', 'AT': 'W'}
+    # wob = {'AG': 'R', 'CT': 'Y', 'AC': 'M', 'GT': 'K', 'CG': 'S', 'AT': 'W'}
 
-    logging.info('Phasing file %s with variants in %s' % (reffile, varfile))
+    logging.info('Phasing file %s with variants in %s', reffile, varfile)
     refseq = list(SeqIO.parse(reffile, 'fasta'))[0]
     reflist = list(str(refseq.seq))
     reflist.insert(0, '')
@@ -240,7 +247,9 @@ def phase_variants(reffile, varfile):
             ref, alt = lsp[3:5]
             infos = dict(a.split('=') for a in lsp[7].split(';'))
             varlen = len(ref)
-            assert str(refseq.seq)[pos - 1:pos - 1 + varlen] == ref, '%s instead of %s at pos %d' % (str(refseq.seq)[pos - 1:pos - 1 + varlen], ref, pos)
+            assert str(refseq.seq)[pos - 1:pos - 1 + varlen] == ref, \
+                '%s instead of %s at pos %d' \
+                    % (str(refseq.seq)[pos - 1:pos - 1 + varlen], ref, pos)
             # exclude multiallelic positions
             nalleles = len(alt.split(','))
             assert nalleles == 1
@@ -269,7 +278,8 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
     ranseed = int(str(pf).split('.')[1][-5:])
 
     # sample reads
-    cml = shlex.split('seqtk sample -s %d %s %d' % (ranseed, reads_file, sampled_reads))
+    cml = shlex.split('seqtk sample -s %d %s %d' \
+        % (ranseed, reads_file, sampled_reads))
     with open('hq_smp.fastq', 'w') as oh:
         subprocess.call(cml, stdout=oh)
     logging.info('reads sampled')
@@ -322,7 +332,7 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
         subprocess.call(cml, shell=True)
         os.remove('tmpref.ndx')
 
-    # os.remove('refcon.sam')
+    os.remove('refcon.sam')
     cml = shlex.split('samtools index refcon_sorted.bam')
     subprocess.call(cml)
 
@@ -390,14 +400,14 @@ def iterate_consensus(reads_file, ref_file):
     except FileNotFoundError:
         logging.info('No variants found in making consensus')
     dh = compute_dist('cns_%d.fasta' % iteration, ref_file)
-    logging.info('distance is %6.4f' % dh)
+    logging.info('distance is %6.4f', dh)
 
     if dh < 5:
         logging.info('Converged at first step')
         return cns_file_1
 
     while iteration <= 10:
-        logging.info('iteration %d' % (iteration + 1))
+        logging.info('iteration %d', iteration + 1)
         # use cns_1.fasta for further consensus rounds
         new_cons = make_consensus('cns_%d.fasta' % iteration, reads_file,
                                   out_file='cns_%d.fasta' % (iteration + 1),
@@ -409,7 +419,7 @@ def iterate_consensus(reads_file, ref_file):
         assert new_cons == 'cns_%d.fasta' % (iteration + 1)
         iteration += 1
         dh = compute_dist('cns_%d.fasta' % iteration, new_cons)
-        logging.info('distance is %6.4f' % dh)
+        logging.info('distance is %6.4f', dh)
         if dh < 5:
             logging.info('converged!')
             break
