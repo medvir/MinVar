@@ -54,7 +54,7 @@ def main():
                   organism=org_found)
 
     from minvar import reportdrm
-    reportdrm.main()
+    reportdrm.main(org_found)
 
     from minvar import stats
     stats.coverage_stats_per_base(prepared_bam)

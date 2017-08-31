@@ -588,8 +588,8 @@ def main(vcf_file=None, ref_file=None, bam_file=None, organism=None):
 
     # mutations can now be annotated and saved
     anno_muts = annotate_mutations(phased, ref_nt, organism)
-    #anno_muts = anno_muts.groupby(['gene', 'pos', 'mut']).sum()
-    #anno_muts = anno_muts.reset_index()
+    anno_muts = anno_muts.groupby(['gene', 'pos', 'wt', 'mut']).sum()
+    anno_muts = anno_muts.reset_index()
     anno_muts = anno_muts.sort_values(
         by=['gene', 'pos', 'freq'], ascending=[True, True, False])
     anno_muts.to_csv(
