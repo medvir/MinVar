@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
+'''Runs everything'''
 
 def main():
-
+    '''What does the main do?'''
     import sys
     import argparse
-    from setuptools_scm import get_version
-
+    # from setuptools_scm import get_version
     from pkg_resources import get_distribution, DistributionNotFound
     try:
         __version__ = get_distribution('minvar').version
+
     except DistributionNotFound:
        # package is not installed
-       pass
-
-    #__version__ = get_version(root='..', relative_to=__file__)
+        pass
 
     # parse command line
     parser = argparse.ArgumentParser()
@@ -24,7 +23,7 @@ def main():
     group1.add_argument("-r", "--recal", action="store_true",
                         help="turn on recalibration with GATK")
     group1.add_argument('-v', '--version', action='version',
-                         version=__version__)
+                        version=__version__)
 
     args = parser.parse_args()
 
@@ -35,15 +34,14 @@ def main():
 
     import logging
     import logging.handlers
-
+    log_format = '%(levelname)s %(asctime)s %(filename)s: %(funcName)s() \
+%(lineno)d: \t%(message)s'
     logging.basicConfig(filename='minvar.log', level=logging.DEBUG,
-                        format='%(levelname)s %(asctime)s %(filename)s: %(funcName)s() %(lineno)d: \t%(message)s', datefmt='%Y/%m/%d %H:%M:%S')
+                        format=log_format, datefmt='%Y/%m/%d %H:%M:%S')
     logging.info(' '.join(sys.argv))
 
-
-
     from minvar import prepare
-    cns_file, prepared_bam = prepare.main(args.f)
+    cns_file, prepared_bam, org_found = prepare.main(args.f)
 
     from minvar import callvar
     called_file, called_bam = callvar.main(ref_file=cns_file,
@@ -52,7 +50,8 @@ def main():
                                            recalibrate=args.recal)
 
     from minvar import annotate
-    annotate.main(vcf_file=called_file, ref_file=cns_file, bam_file=called_bam)
+    annotate.main(vcf_file=called_file, ref_file=cns_file, bam_file=called_bam,
+                  organism=org_found)
 
     from minvar import reportdrm
     reportdrm.main()

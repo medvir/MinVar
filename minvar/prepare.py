@@ -438,18 +438,15 @@ def main(read_file=None, max_n_reads=200000):
     organism, best_subtype, subtype_file = find_subtype(filtered_file)
 
     ref_dict = SeqIO.to_dict(SeqIO.parse(references_file, 'fasta'))
-    SeqIO.write([ref_dict[best_subtype]], 'cnsrefstart.fasta', 'fasta')
-    cns_file = iterate_consensus(filtered_file, 'cnsrefstart.fasta')
-    os.remove('cnsrefstart.fasta')
-    print(cns_file)
-
+    SeqIO.write([ref_dict[best_subtype]], 'subtype_ref.fasta', 'fasta')
+    cns_file = iterate_consensus(filtered_file, 'subtype_ref.fasta')
     os.rename(cns_file, 'cns_final.fasta')
     cml = shlex.split('samtools faidx cns_final.fasta')
     subprocess.call(cml)
 
     prepared_file = align_reads(ref='cns_final.fasta', reads=filtered_file, out_file='hq_2_cns_final.bam')
 
-    return 'cns_final.fasta', prepared_file
+    return 'cns_final.fasta', prepared_file, organism
 
 if __name__ == "__main__":
     import sys
