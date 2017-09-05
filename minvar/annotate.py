@@ -297,7 +297,7 @@ def phase_mutations(muts, frame, bam_file):
         # mutated positions overlapping the codon
         mut_over = muts[muts.pos.isin(codon_pos)]
 
-        if len(mut_over) == 0:
+        if mut_over.empty:
             continue
 
         # positions where a deletion is detected
@@ -416,7 +416,7 @@ def annotate_mutations(mutations, ref, org_found):
     '''
 
     anno_variants = pd.DataFrame(columns=['gene', 'pos', 'wt', 'mut', 'freq'])
-    if len(mutations) == 0:
+    if mutations.empty:
         return anno_variants
 
     ref_nt = ref.seq
@@ -467,12 +467,12 @@ def annotate_mutations(mutations, ref, org_found):
         except Bio.Data.CodonTable.TranslationError:
             if '---' in mut_nt:
                 mut_aa = ''.join(
-                    [translation_table[str(mut_nt[i:i + 3])] \
+                    [translation_table[str(mut_nt[i:i + 3])]
                      for i in range(0, len(mut_nt), 3)])
             else:
                 warnings.warn(
-                    'CodonTable translation error: wt:%s pos:%d alt:%s' % \
-                        (v.wt, v.pos, alt_nt))
+                    'CodonTable translation error: wt:%s pos:%d alt:%s' %
+                    (v.wt, v.pos, alt_nt))
                 continue
         assert len(mut_aa) == len(B_aa), \
             '%d is not %d' % (len(mut_aa), len(B_aa))
