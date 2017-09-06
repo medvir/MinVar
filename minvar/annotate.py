@@ -423,6 +423,7 @@ def annotate_mutations(mutations, ref, org_found):
     if org_found == 'HIV':
         B_nt = B_pol_nt_seq
         B_aa = B_pol_aa_seq
+        orf_pos = 0
     elif org_found == 'HCV':
         sub_ref_nt_seq = list(SeqIO.parse('subtype_ref.fasta', 'fasta'))[0].seq
         orf_seq, orf_pos = extract_hcv_orf(sub_ref_nt_seq)

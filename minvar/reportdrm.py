@@ -197,7 +197,8 @@ def main(org=None, mut_file='annotated_mutations.csv',
 
         cols = ['gene', 'pos', 'mut', 'freq', 'category']
         drms = drms[cols]
-        drms.sort_values(cols[:3], inplace=True)
+        drms.sort_values(by=['gene', 'pos', 'freq'], inplace=True,
+                         ascending=[True, True, False])
         drms.to_csv('annotated_DRM.csv', index=False)
 
         for gene in ['protease', 'RT', 'integrase']:
@@ -208,23 +209,24 @@ def main(org=None, mut_file='annotated_mutations.csv',
                 print('-' * (len(gene) + 16), file=rh)
                 print(file=rh)
                 continue
-
-            grouped = gene_muts.groupby(['pos', 'mut'])
+            # sort was lost because
+            gene_muts = gene_muts.sort_values(
+                by=['gene', 'pos', 'freq'], ascending=[True, True, False])
             print('%s' % gene, file=rh)
             print('-'*len(gene), file=rh)
             h1 = '| position | mutation | frequency [%] |      category      |'
             print(h1, file=rh)
             h2 = '|:{:-^8}:|:{:-^8}:|:{:-^13}:|:{:-^18}:|'
             print(h2.format('', '', '', ''), file=rh)
-            for name, group in grouped:
-                # same pos mut tuple must give same annota, probably redundant
-                assert group['category'].nunique() == 1, \
-                    group['category'].describe()
-                mut_cat = group['category'].unique()[0]
-                int_freq = int(round(100 * group['freq'].sum(), 0))
+            for index, row in gene_muts.iterrows():
+                # # same pos mut tuple must give same annota, probably redundant
+                # assert group['category'].nunique() == 1, \
+                #     group['category'].describe()
+                mut_cat = row['category']
+                int_freq = int(round(100 * row['freq'], 0))
                 print(
-                    '|{: ^10}|{: ^10}|{: ^15}|{: ^20}|'.format(int(name[0]),
-                                                               name[1],
+                    '|{: ^10}|{: ^10}|{: ^15}|{: ^20}|'.format(int(row['pos']),
+                                                               row['mut'],
                                                                int_freq,
                                                                mut_cat),
                     file=rh)
@@ -247,20 +249,20 @@ def main(org=None, mut_file='annotated_mutations.csv',
                 print(file=rh)
                 continue
 
-            grouped = gene_muts.groupby(['pos', 'mut'])
             print('%s' % gene, file=rh)
             print('-'*len(gene), file=rh)
             h1 = '| position | mutation | frequency [%] |'
             print(h1, file=rh)
             h2 = '|:{:-^8}:|:{:-^8}:|:{:-^13}:|'
             print(h2.format('', '', ''), file=rh)
-            for name, group in grouped:
-                int_freq = int(round(100 * group['freq'].sum(), 0))
+            for index, row in gene_muts.iterrows():
+                int_freq = int(round(100 * row['freq'], 0))
                 print(
-                    '|{: ^10}|{: ^10}|{: ^15}|'.format(int(name[0]),
-                                                       name[1],
+                    '|{: ^10}|{: ^10}|{: ^15}|'.format(int(row['pos']),
+                                                       row['mut'],
                                                        int_freq),
                     file=rh)
+                del index
             print('\n', file=rh)
 
     rh.close()
@@ -274,4 +276,4 @@ def main(org=None, mut_file='annotated_mutations.csv',
 if __name__ == '__main__':
     #args = parse_com_line()
     main(org=sys.argv[1], mut_file='annotated_mutations.csv',
-             subtypes_file='subtype_evidence.csv')
+         subtypes_file='subtype_evidence.csv')
