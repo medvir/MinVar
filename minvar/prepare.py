@@ -10,8 +10,10 @@ import logging
 from pkg_resources import resource_filename
 
 from Bio import SeqIO
+from Bio.SeqRecord import SeqRecord
 
 references_file = resource_filename(__name__, 'db/subtype_references.fasta')
+blast2sam_exe = resource_filename(__name__, 'blast2sam.py')
 #HIV_amp = resource_filename(__name__, 'db/consensus_B.fna')
 #HCV_amp =
 
@@ -296,9 +298,9 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
         subprocess.call(cml)
 
         logging.info('convert to SAM -> BAM')
-        cml = shlex.split('blast2sam.py outblast.xml')
-        with open('refcon.sam') as oh:
-            subprocess.call(cml, shtdout=oh)
+        cml = shlex.split('%s outblast.xml' % shlex.quote(blast2sam_exe))
+        with open('refcon.sam', 'w') as oh:
+            subprocess.call(cml, stdout=oh)
 
         # reverse reads are not yet properly treated, so -F 16
         cmls = 'samtools view -F 16 -u refcon.sam | samtools sort -T /tmp -o refcon_sorted.bam'
@@ -363,7 +365,7 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
     elif cons_caller == 'own':
         logging.info('applying variants to consensus')
         # we need to copy the ref_file locally because lofreq parallel does
-        # not quote filenames and fails with sapces/parentheses
+        # not quote filenames and fails with spaces/parentheses
         try:
             shutil.copy(ref_file, '.')
         except shutil.SameFileError:
@@ -394,7 +396,7 @@ def iterate_consensus(reads_file, ref_file):
     # consensus from first round is saved into cns_1.fasta
     cns_file_1 = make_consensus(ref_file, reads_file,
                                 out_file='cns_%d.fasta' % iteration,
-                                sampled_reads=50000, mapper='bwa')
+                                sampled_reads=50000, mapper='blast')
     try:
         os.rename('calls.vcf.gz', 'calls_%d.vcf.gz' % iteration)
     except FileNotFoundError:
@@ -402,7 +404,7 @@ def iterate_consensus(reads_file, ref_file):
     dh = compute_dist('cns_%d.fasta' % iteration, ref_file)
     logging.info('distance is %6.4f', dh)
 
-    if dh < 5:
+    if dh < 1:
         logging.info('Converged at first step')
         return cns_file_1
 
@@ -420,7 +422,7 @@ def iterate_consensus(reads_file, ref_file):
         iteration += 1
         dh = compute_dist('cns_%d.fasta' % iteration, new_cons)
         logging.info('distance is %6.4f', dh)
-        if dh < 5:
+        if dh < 1:
             logging.info('converged!')
             break
 
@@ -428,6 +430,7 @@ def iterate_consensus(reads_file, ref_file):
 
 
 def compute_dist(file1, file2):
+    '''Compute the distance between two sequences (given in two files)'''
     cml = 'blastn -query %s -subject %s -out pair.tsv -outfmt "6 qseqid sseqid pident"' % (shlex.quote(file1), shlex.quote(file2))
 
     subprocess.call(cml, shell=True)
@@ -438,6 +441,7 @@ def compute_dist(file1, file2):
 
 
 def main(read_file=None, max_n_reads=200000):
+    '''What does the main do?'''
     assert os.path.exists(read_file), 'File %s not found' % read_file
 
     min_len = compute_min_len(read_file)
@@ -448,7 +452,9 @@ def main(read_file=None, max_n_reads=200000):
     organism, best_subtype, subtype_file = find_subtype(filtered_file)
 
     ref_dict = SeqIO.to_dict(SeqIO.parse(references_file, 'fasta'))
-    SeqIO.write([ref_dict[best_subtype]], 'subtype_ref.fasta', 'fasta')
+    ref_rec = SeqRecord(ref_dict[best_subtype].seq,
+                        id=best_subtype.split('.')[0], description='')
+    SeqIO.write([ref_rec], 'subtype_ref.fasta', 'fasta')
     cns_file = iterate_consensus(filtered_file, 'subtype_ref.fasta')
     os.rename(cns_file, 'cns_final.fasta')
     cml = shlex.split('samtools faidx cns_final.fasta')
