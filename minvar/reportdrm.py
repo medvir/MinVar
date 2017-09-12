@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
+'''Parse the different output files and write a report in markdown,
+then convert it to pdf with markdown.
+'''
 
 import sys
 import os
 import csv
-import warnings
-from pprint import pprint
-
-from pkg_resources import resource_string
-#foo_config = resource_string(__name__, 'foo.conf')
+# from pkg_resources import resource_string
+# foo_config = resource_string(__name__, 'foo.conf')
 
 import pandas as pd
-from Bio import SeqIO
 
 # aminoacid one-letter code
 aa_set = set('GPAVLIMCFYWHKRQNEDST')
@@ -18,6 +17,26 @@ aa_set = set('GPAVLIMCFYWHKRQNEDST')
 # amminoacid sequences from files in db directory
 dn_dir = os.path.dirname(__file__)
 db_dir = os.path.abspath(os.path.join(dn_dir, 'db'))
+
+hcv_map = {
+    'AB030907': '2b',
+    'AB031663': '2k',
+    'AB047639': '2a',
+    'D00944': '2a',
+    'D10988': '2b',
+    'D17763': '3a',
+    'D28917': '3a',
+    'D49374': '3b',
+    'D50409': '2c',
+    'D63821': '3k',
+    'D90208': '1b',
+    'M58335': '1b',
+    'M62321': '1a',
+    'M67463': '1a',
+    'Y11604': '4a'}
+
+
+
 # prot = \
 #     list(SeqIO.parse(os.path.join(db_dir, 'protease.faa'), 'fasta'))[0]
 # RT = list(SeqIO.parse(os.path.join(db_dir, 'RT.faa'), 'fasta'))[0]
@@ -33,11 +52,12 @@ def parse_drm():
                                 ('integrase', 'masterComments_INI.txt')]:
         drm_file = os.path.join(db_dir, drm_file_name)
         try:
-            d1 = pd.read_table(drm_file, header=0, names=['pos', 'mut', 'category',
-                               'commented', 'comment'])
+            d1 = pd.read_table(drm_file, header=0,
+                               names=['pos', 'mut', 'category', 'commented',
+                                      'comment'])
         except:  # integrase does not have commented column
-            d1 = pd.read_table(drm_file, header=0, names=['pos', 'mut', 'category',
-                               'comment'])
+            d1 = pd.read_table(drm_file, header=0,
+                               names=['pos', 'mut', 'category', 'comment'])
         gs = pd.Series([gene] * len(d1))
         d1['gene'] = gs
         df_list.append(d1)
@@ -65,23 +85,32 @@ def parse_drm():
 #     return matched_res
 
 
-def write_header(handle, subtype_file=None):
+def write_header(handle, subtype_file=None, org_found=None):
     '''Write header to a file in markdown format'''
+    from operator import itemgetter
     md_header = 'Drug resistance mutations detected by NGS sequencing'
-    mc = len(md_header)
     md_header += '\n' + '=' * len(md_header) + '\n\n'
-    md_header +='Subtype inference with blast\n'
-    md_header +='----------------------------\n'
+    md_header += 'Subtype inference with blast\n'
+    md_header += '----------------------------\n'
     md_header += '|     subtype     | support [%] |\n'
-    md_header += '|:{:-^15}:|:{:-^11}:|\n'.format('', '', '')
+    md_header += '|:{:-^15}:|:{:-^11}:|\n'.format('', '')
     if subtype_file:
+        save_freq = {}
         with open(subtype_file) as csvfile:
             spamreader = csv.reader(csvfile, delimiter=',')
-            for mtype, freq in spamreader:
+            for m, freq in spamreader:
+                if org_found == 'HCV':
+                    mtype = hcv_map[m.split('.')[0]]
+                else:
+                    mtype = m
                 int_freq = int(round(100 * float(freq), 0))
                 if int_freq >= 1:
-                    md_header += '|{: ^17}|{: ^13}|\n'.format(mtype, int_freq)
-    md_header += '''
+                    save_freq[mtype] = save_freq.get(mtype, 0) + int_freq
+        for k, v in sorted(save_freq.items(), key=itemgetter(1),
+                           reverse=True):
+            md_header += '|{: ^17}|{: ^13}|\n'.format(k, v)
+    if org_found == 'HIV':
+        md_header += '''
 
 Parsing mutations
 -----------------
@@ -108,10 +137,11 @@ def parse_com_line():
 
 
 def aa_unpack(mut_string):
+    '''Helper function used to extract a set of amminoacids from the
+    merged csv files.'''
     if not mut_string.startswith('NOT'):
         return set(mut_string)
-    else:
-        return aa_set - set(mut_string.split()[1])
+    return aa_set - set(mut_string.split()[1])
 
 
 def parse_merged(mer_file):
@@ -134,68 +164,107 @@ def parse_merged(mer_file):
     return mdf
 
 
-def main(mut_file='annotated_mutations.csv', subtypes_file='subtype_evidence.csv'):
+def main(org=None, mut_file='annotated_mutations.csv',
+         subtypes_file='subtype_evidence.csv'):
     '''What does the main do?'''
 
     import subprocess
 
     rh = open('report.md', 'w')
-    write_header(rh, subtypes_file)
-
-    #cov_info = get_coverage_info()
-
-    print('Parsing DRM from database', file=sys.stderr)
-    resistance_mutations = parse_drm()
-    print('Shape is: ', resistance_mutations.shape)
+    write_header(rh, subtypes_file, org)
 
     print('Reading mutations from %s' % mut_file, file=sys.stderr)
     mutation_detected = pd.read_csv(mut_file)
     print('Shape is: ', mutation_detected.shape)
 
-    mpd = pd.merge(mutation_detected, resistance_mutations, how='left',
-                   on=['gene', 'pos'])
-    mpd.to_csv(path_or_buf='merged_muts_drm_annotated.csv')
-    print('Shape of raw merged is: ', mpd.shape)
+    if org == 'HIV':
+        print('Parsing DRM from database', file=sys.stderr)
+        resistance_mutations = parse_drm()
+        print('Shape is: ', resistance_mutations.shape)
 
-    # too complicated with panda, do it by hand
-    drms = parse_merged('merged_muts_drm_annotated.csv')
-    print('Shape of merged is: ', drms.shape)
-    #os.remove('merged_muts.csv')
+        mpd = pd.merge(mutation_detected, resistance_mutations, how='left',
+                       on=['gene', 'pos'])
+        mpd.to_csv(path_or_buf='merged_muts_drm_annotated.csv')
+        print('Shape of raw merged is: ', mpd.shape)
 
-    drms.drop(['', 'commented', 'mut_y'], axis=1, inplace=True)
-    drms.rename(columns={'mut_x': 'mut'}, inplace=True)
+        # too complicated with panda, do it by hand
+        drms = parse_merged('merged_muts_drm_annotated.csv')
+        print('Shape of merged is: ', drms.shape)
+        #os.remove('merged_muts.csv')
 
-    cols = ['gene', 'pos', 'mut', 'freq', 'category']
-    drms = drms[cols]
-    drms.sort_values(cols[:3], inplace=True)
-    drms.to_csv('annotated_DRM.csv', index=False)
+        drms.drop(['', 'commented', 'mut_y'], axis=1, inplace=True)
+        drms.rename(columns={'mut_x': 'mut'}, inplace=True)
 
-    for gene in ['protease', 'RT', 'integrase']:
-        gene_muts = drms[drms.gene == gene]
-        if gene_muts.shape[0] == 0:
-            print('No mutations on ', gene, file=sys.stderr)
-            print('No mutations on %s' % gene, file=rh)
-            print('-' * (len(gene) + 16), file=rh)
-            print(file=rh)
-            continue
+        cols = ['gene', 'pos', 'mut', 'freq', 'category']
+        drms = drms[cols]
+        drms.sort_values(by=['gene', 'pos', 'freq'], inplace=True,
+                         ascending=[True, True, False])
+        drms.to_csv('annotated_DRM.csv', index=False)
 
-        grouped = gene_muts.groupby(['pos', 'mut'])
-        print('%s' % gene, file=rh)
-        print('-'*len(gene), file=rh)
-        print('| position | mutation | frequency [%] |      category      |',
-              file=rh)
-        print('|:{:-^8}:|:{:-^8}:|:{:-^13}:|:{:-^18}:|'.format('', '', '', ''),
-              file=rh)
-        for name, group in grouped:
-            # same pos mut tuple must give same annotation, probably redundant
-            assert group['category'].nunique() == 1, group['category'].describe()
-            mut_cat = group['category'].unique()[0]
-            int_freq = int(round(100 * group['freq'].sum(), 0))
-            print('|{: ^10}|{: ^10}|{: ^15}|{: ^20}|'.format(int(name[0]),
-                                                     name[1],
-                                                     int_freq,
-                                                     mut_cat), file=rh)
-        print('\n', file=rh)
+        for gene in ['protease', 'RT', 'integrase']:
+            gene_muts = drms[drms.gene == gene]
+            if gene_muts.shape[0] == 0:
+                print('No mutations on ', gene, file=sys.stderr)
+                print('No mutations on %s' % gene, file=rh)
+                print('-' * (len(gene) + 16), file=rh)
+                print(file=rh)
+                continue
+            # sort was lost because
+            gene_muts = gene_muts.sort_values(
+                by=['gene', 'pos', 'freq'], ascending=[True, True, False])
+            print('%s' % gene, file=rh)
+            print('-'*len(gene), file=rh)
+            h1 = '| position | mutation | frequency [%] |      category      |'
+            print(h1, file=rh)
+            h2 = '|:{:-^8}:|:{:-^8}:|:{:-^13}:|:{:-^18}:|'
+            print(h2.format('', '', '', ''), file=rh)
+            for index, row in gene_muts.iterrows():
+                # # same pos mut tuple must give same annota, probably redundant
+                # assert group['category'].nunique() == 1, \
+                #     group['category'].describe()
+                mut_cat = row['category']
+                int_freq = int(round(100 * row['freq'], 0))
+                print(
+                    '|{: ^10}|{: ^10}|{: ^15}|{: ^20}|'.format(int(row['pos']),
+                                                               row['mut'],
+                                                               int_freq,
+                                                               mut_cat),
+                    file=rh)
+            print('\n', file=rh)
+    elif org == 'HCV':
+        drms = pd.read_csv('annotated_mutations.csv')
+        print('Shape of annotated_mutations is: ', mutation_detected.shape)
+
+        if drms.shape[0] == 0:
+            print('No mutations found', file=rh)
+            print('-' * 26, file=rh)
+            print('\n', file=rh)
+
+        for gene in ['unknown']:
+            gene_muts = drms[drms.gene == gene]
+            if gene_muts.shape[0] == 0:
+                print('No mutations on ', gene, file=sys.stderr)
+                print('No mutations on %s' % gene, file=rh)
+                print('-' * (len(gene) + 16), file=rh)
+                print(file=rh)
+                continue
+
+            print('%s' % gene, file=rh)
+            print('-'*len(gene), file=rh)
+            h1 = '| position | mutation | frequency [%] |'
+            print(h1, file=rh)
+            h2 = '|:{:-^8}:|:{:-^8}:|:{:-^13}:|'
+            print(h2.format('', '', ''), file=rh)
+            for index, row in gene_muts.iterrows():
+                int_freq = int(round(100 * row['freq'], 0))
+                print(
+                    '|{: ^10}|{: ^10}|{: ^15}|'.format(int(row['pos']),
+                                                       row['mut'],
+                                                       int_freq),
+                    file=rh)
+                del index
+            print('\n', file=rh)
+
     rh.close()
     # convert to PDF with pandoc
     tmpl_file = os.path.abspath(os.path.join(db_dir, 'template.tex'))
@@ -206,4 +275,5 @@ def main(mut_file='annotated_mutations.csv', subtypes_file='subtype_evidence.csv
 
 if __name__ == '__main__':
     #args = parse_com_line()
-    main()
+    main(org=sys.argv[1], mut_file='annotated_mutations.csv',
+         subtypes_file='subtype_evidence.csv')
