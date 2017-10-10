@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+'''Sequences in refs are full genome from different genotypes.
+This looks for ref_id in refs, translates and aligns to a protein from
+h77 in order to extract the one for the requested genotype
+'''
 import os
 import sys
 import shlex
@@ -15,9 +19,9 @@ sys.modules["minvar"] = mod
 from minvar.common import hcv_map
 
 def extract_protein(ref_id, prot):
-    '''Sequences in refs are full genome from different genotypes.
-    This looks for ref_id in refs, translates and aligns to a known
-    ns5a/ns5b in order to extract the one for the requested genotype
+    '''Workhorse for the script, takes a single accession number and protein
+    and returns the corresponding translated region by aligning against the
+    protein from H77 isolate
     '''
 
     try:
