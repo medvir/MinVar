@@ -105,7 +105,7 @@ class AlignInstance:
 
         self.start = start
         self.stop = stop
-        if start == None and stop == None:
+        if start is None and stop is None:
             warnings.warn('The two sequences do not align')
             return
         self.insertions = 0  # gap in the first sequence
@@ -228,7 +228,8 @@ def needle_align(a_seq, b_seq, out_file, go=GO, ge=GE,
         if retcode < 0:
             if Verbose:
                 print("'%s'" % line1, file=sys.stderr)
-                print("Child diri_sampler was terminated by signal", -retcode, file=sys.stderr)
+                print("Child diri_sampler was terminated by signal", -retcode,
+                      file=sys.stderr)
         else:
             if Verbose:
                 print("Child diri_sampler returned %i" % retcode)

@@ -1,27 +1,22 @@
 #!/usr/bin/env python
-from pprint import pprint
-import subprocess
-
-'''' Download ref sequences from ICTV maintained file
-download with
+'''' Download ref sequences from ICTV maintained file with
 wget -O HCV_ref.fasta https://talk.ictvonline.org/ictv_wikis/flaviviridae/hepacivirus/m/hepacivirus-files/6789/download
+or interrogate NCBI with efetch
 '''
-# from Table 1 of 10.1002/hep.20819, acc number of confirmed HCV genotypes/subtypes
-acc_numbers = {
-    '1a': ['M62321', 'M67463'],
-    '1b': ['D90208', 'M58335'],
-    '2a': ['D00944', 'AB047639'],
-    '2b': ['D10988', 'AB030907'],
-    '2c': ['D50409'],
-    '2k': ['AB031663'],
-    '3a': ['D17763', 'D28917'],
-    '3b': ['D49374'],
-    '3k': ['D63821'],
-    '4a': ['Y11604']
-}
+
+import os
+import sys
+import subprocess
+from pprint import pprint
+
+# manipulate path to import functions
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.sys.path.insert(1, parent_dir)
+mod = __import__('minvar')
+sys.modules["minvar"] = mod
+from minvar.common import acc_numbers
 
 genotype = {}
-
 acc_list = []
 for k, v in acc_numbers.items():
     for n in v:
@@ -30,4 +25,4 @@ for k, v in acc_numbers.items():
 pprint(genotype)
 
 cml = 'efetch -db nuccore -format fasta -id \"%s\" > HCV_ref.fasta' % ','.join(acc_list)
-#subprocess.call(cml, shell=True)
+subprocess.call(cml, shell=True)

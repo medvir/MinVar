@@ -12,6 +12,11 @@ from pkg_resources import resource_filename
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 
+# manipulate path to import functions
+dn_dir = os.path.dirname(os.path.abspath(__file__))
+os.sys.path.insert(1, dn_dir)
+import Alignment
+
 references_file = resource_filename(__name__, 'db/subtype_references.fasta')
 blast2sam_exe = resource_filename(__name__, 'blast2sam.py')
 #HIV_amp = resource_filename(__name__, 'db/consensus_B.fna')
@@ -401,8 +406,8 @@ def iterate_consensus(reads_file, ref_file):
         os.rename('calls.vcf.gz', 'calls_%d.vcf.gz' % iteration)
     except FileNotFoundError:
         logging.info('No variants found in making consensus')
-    dh = compute_dist('cns_%d.fasta' % iteration, ref_file)
-    logging.info('distance is %6.4f', dh)
+    dh, gaps = compute_dist('cns_%d.fasta' % iteration, ref_file)
+    logging.info('distance = %6.4f percent --- gaps = %d', dh, gaps)
 
     if dh < 1:
         logging.info('Converged at first step')
@@ -431,13 +436,29 @@ def iterate_consensus(reads_file, ref_file):
 
 def compute_dist(file1, file2):
     '''Compute the distance between two sequences (given in two files)'''
-    cml = 'blastn -query %s -subject %s -out pair.tsv -outfmt "6 qseqid sseqid pident"' % (shlex.quote(file1), shlex.quote(file2))
+    # alout = 'pair.needle'
+    # Alignment.needle_align(file1, file2, alout, go=10, ge=1)
+    # ald = Alignment.alignfile2dict([alout])
+    # #os.remove(alout)
+    # k1 = list(ald.keys())[0]
+    # k2 = list(ald[k1].keys())[0]
+    # ali = ald[k1][k2]
+    # ali.summary()
+    # #ratio1 = float(ali.ident) / (ali.ident + ali.mismatches)
+    # al_len = ali.stop - ali.start + 1
+    # dh = 100 * float(ali.mismatches) / al_len
+    # gaps = ali.insertions + ali.deletions
+    # return dh, gaps
 
-    subprocess.call(cml, shell=True)
+    cml = shlex.split(
+        'blastn -gapopen 20 -gapextend 2 -query %s -subject %s -out pair.tsv -outfmt "6 qseqid sseqid pident gaps"' % (shlex.quote(file1), shlex.quote(file2))
+        )
+
+    subprocess.call(cml)
     with open('pair.tsv') as h:
         for l in h:
-            ident = l.split('\t')[-1]
-    return 100 - float(ident)
+            ident, gaps = l.split('\t')[2:]
+    return 100 - float(ident), int(gaps)
 
 
 def main(read_file=None, max_n_reads=200000):
