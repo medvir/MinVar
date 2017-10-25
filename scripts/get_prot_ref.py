@@ -65,7 +65,13 @@ def extract_protein(ref_id, prot):
     target = str(aln[1, :].seq)
     start = len(base) - len(base.lstrip('-'))
     stop = len(base.rstrip('-'))
-
+    dist = sum((base[i] != target[i] for i in range(start, stop)))
+    dist = float(dist) / (stop - start)
+    if dist > 0.0:
+        print(round(dist, 3))
+        print(ref_id, prot)
+        print(target[start:stop])
+        print(base[start:stop])
     return target[start:stop]
 
 
@@ -92,7 +98,7 @@ for k, v in h77_locations.items():
     SeqIO.write(sr1, s_id + '.faa', 'fasta')
 
 s_ids = ['M62321', 'M58335', 'D00944', 'D10988', 'D17763', 'Y11604']
-target_prots = ['ns3', 'ns4a', 'ns4b', 'ns5b', 'ns5a']
+target_prots = ['ns3', 'ns4a', 'ns4b', 'ns5a', 'ns5b']
 
 for target_prot in target_prots:
     for s_id in s_ids:
