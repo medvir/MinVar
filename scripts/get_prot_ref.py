@@ -91,9 +91,8 @@ for k, v in h77_locations.items():
     sr1 = SeqRecord(h77_poly[sta:sto].seq, id=s_id, description='')
     SeqIO.write(sr1, s_id + '.faa', 'fasta')
 
-
 s_ids = ['M62321', 'M58335', 'D00944', 'D10988', 'D17763', 'Y11604']
-target_prots = ['ns3', 'ns5b', 'ns5a']
+target_prots = ['ns3', 'ns4a', 'ns4b', 'ns5b', 'ns5a']
 
 for target_prot in target_prots:
     for s_id in s_ids:
