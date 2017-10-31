@@ -80,7 +80,7 @@ class AlignInstance:
         summary must be called to calculate start, stop,
         internal gaps, and identity
         '''
-        import itertools
+
         import warnings
 
         start = None
@@ -114,7 +114,7 @@ class AlignInstance:
         self.mismatches = 0
 
         it_pair = zip(self.seq_a[start - 1:stop],
-                                 self.seq_b[start - 1:stop])
+                      self.seq_b[start - 1:stop])
 
         # determine which sequence type to count mismatches correctly
         both = self.seq_a + self.seq_b

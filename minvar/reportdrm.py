@@ -8,8 +8,9 @@ import os
 import csv
 # from pkg_resources import resource_string
 # foo_config = resource_string(__name__, 'foo.conf')
-
 import pandas as pd
+
+#from common import acc_numbers, hcv_map
 
 # aminoacid one-letter code
 aa_set = set('GPAVLIMCFYWHKRQNEDST')
@@ -17,25 +18,6 @@ aa_set = set('GPAVLIMCFYWHKRQNEDST')
 # amminoacid sequences from files in db directory
 dn_dir = os.path.dirname(__file__)
 db_dir = os.path.abspath(os.path.join(dn_dir, 'db'))
-
-hcv_map = {
-    'AB030907': '2b',
-    'AB031663': '2k',
-    'AB047639': '2a',
-    'D00944': '2a',
-    'D10988': '2b',
-    'D17763': '3a',
-    'D28917': '3a',
-    'D49374': '3b',
-    'D50409': '2c',
-    'D63821': '3k',
-    'D90208': '1b',
-    'M58335': '1b',
-    'M62321': '1a',
-    'M67463': '1a',
-    'Y11604': '4a'}
-
-
 
 # prot = \
 #     list(SeqIO.parse(os.path.join(db_dir, 'protease.faa'), 'fasta'))[0]
@@ -98,11 +80,7 @@ def write_header(handle, subtype_file=None, org_found=None):
         save_freq = {}
         with open(subtype_file) as csvfile:
             spamreader = csv.reader(csvfile, delimiter=',')
-            for m, freq in spamreader:
-                if org_found == 'HCV':
-                    mtype = hcv_map[m.split('.')[0]]
-                else:
-                    mtype = m
+            for mtype, freq in spamreader:
                 int_freq = int(round(100 * float(freq), 0))
                 if int_freq >= 1:
                     save_freq[mtype] = save_freq.get(mtype, 0) + int_freq

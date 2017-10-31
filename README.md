@@ -95,3 +95,9 @@ drug resistance genotyping by deep sequencing _Journal of virological methods_
   result is a table of mutations
 - `annotated_mutations.csv` mutations at amminoacid level with indication of
   the gene, the position on the gene, wild type and frequency
+
+### Created by `reportdrm.py`
+
+- `report.md` and `report.pdf` final report with subtye estimate based on
+  alignment of reads to different references and tables with mutations. The
+  pdf report is created from the template `minvar/db/template.tex`.

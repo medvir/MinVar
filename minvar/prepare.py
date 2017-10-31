@@ -4,65 +4,29 @@ import os
 import os.path
 import gzip
 import shlex
-import subprocess
 import shutil
 import logging
+import subprocess
 from pkg_resources import resource_filename
 
 from Bio import SeqIO
+from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
-# manipulate path to import functions
+from .Alignment import needle_align
+from .stats import genome_coverage
+from .common import hcv_map, acc_numbers, org_dict
+
 dn_dir = os.path.dirname(os.path.abspath(__file__))
-os.sys.path.insert(1, dn_dir)
-import Alignment
-
-references_file = resource_filename(__name__, 'db/subtype_references.fasta')
+HCV_references = resource_filename(__name__, 'db/HCV/subtype_references.fasta')
+HIV_references = resource_filename(__name__, 'db/HIV/subtype_references.fasta')
+HCV_recomb_references = \
+    resource_filename(__name__, 'db/HCV/recomb_references.fasta')
+HIV_recomb_references = \
+    resource_filename(__name__, 'db/HIV/recomb_references.fasta')
 blast2sam_exe = resource_filename(__name__, 'blast2sam.py')
-#HIV_amp = resource_filename(__name__, 'db/consensus_B.fna')
-#HCV_amp =
-
-org_dict = {'D50409.1': 'HCV',
-            'D49374.1': 'HCV',
-            'Y11604.1': 'HCV',
-            'D63821.1': 'HCV',
-            'D90208.1': 'HCV',
-            'M58335.1': 'HCV',
-            'M62321.1': 'HCV',
-            'M67463.1': 'HCV',
-            'D17763.1': 'HCV',
-            'D28917.1': 'HCV',
-            'D00944.1': 'HCV',
-            'AB047639.1': 'HCV',
-            'AB031663.1': 'HCV',
-            'D10988.1': 'HCV',
-            'AB030907.1': 'HCV',
-            'CON_OF_CONS': 'HIV',
-            'Mgroup': 'HIV',
-            'CONSENSUS_A1': 'HIV',
-            'A1.anc': 'HIV',
-            'CONSENSUS_A2': 'HIV',
-            'CONSENSUS_B': 'HIV',
-            'B.anc': 'HIV',
-            'CONSENSUS_C': 'HIV',
-            'C.anc': 'HIV',
-            'CONSENSUS_D': 'HIV',
-            'CONSENSUS_F1': 'HIV',
-            'CONSENSUS_F2': 'HIV',
-            'CONSENSUS_G': 'HIV',
-            'CONSENSUS_H': 'HIV',
-            'CONSENSUS_01_AE': 'HIV',
-            'CONSENSUS_02_AG': 'HIV',
-            'CONSENSUS_03_AB': 'HIV',
-            'CONSENSUS_04_CPX': 'HIV',
-            'CONSENSUS_06_CPX': 'HIV',
-            'CONSENSUS_08_BC': 'HIV',
-            'CONSENSUS_10_CD': 'HIV',
-            'CONSENSUS_11_CPX': 'HIV',
-            'CONSENSUS_12_BF': 'HIV',
-            'CONSENSUS_14_BG': 'HIV'
-           }
-
+HIV_amp = resource_filename(__name__, 'db/HIV/consensus_B.fna')
+# HCV_amp =
 
 qual_thresh = 20
 
@@ -72,10 +36,50 @@ except TypeError:
     CPUS = 1
 
 
+def pad_consensus(denovo_seq, organism, subtype):
+    """denovo consensus will most likely not span the whole sequenced region.
+    The rest of the program expects sequences of a specific length, so we pad
+    the denovo sequence with the missing region.
+    """
+    if organism == 'HIV':  # use the mutation neutral consensus_B
+        ref = list(SeqIO.parse(HIV_amp, 'fasta'))[0]
+    elif organism == 'HCV':  # use the best subtype
+        if subtype == 'RF1_2k/1b':
+            ref = list(SeqIO.parse(HCV_recomb_references, 'fasta'))[0]
+            assert ref.id.startswith('AY587845')
+        else:
+            an = acc_numbers[subtype][0]
+            ref = [s for s in SeqIO.parse(HCV_references, 'fasta')
+                   if s.id.startswith(an)][0]
+    al_file = 'padalign.fasta'
+    needle_align('asis:%s' % str(ref.seq),
+                 'asis:%s' % str(denovo_seq.seq), al_file)
+
+    al_ref, al_den = [str(s.seq) for s in
+                      SeqIO.parse(al_file, 'fasta')]
+    os.remove(al_file)
+    # first non gap positions
+    den_start = len(al_den) - len(al_den.lstrip('-'))
+    den_stop = len(al_den.rstrip('-'))
+    ref_start = len(al_ref) - len(al_ref.lstrip('-'))
+    ref_stop = len(al_ref.rstrip('-'))
+    # where the shortest sequence ends
+    min_stop = min(den_stop, ref_stop)
+    # if denovo doesn't cover the beginning, take it from the reference
+    if den_start > ref_start:
+        padded = al_ref[:den_start] + al_den[den_start:min_stop]
+    else:
+        padded = al_den[ref_start:min_stop]
+    # if denovo doesn't cover the end, take it from the reference
+    if ref_stop > min_stop:
+        padded += al_ref[min_stop:ref_stop]
+
+    return padded
+
 def compute_min_len(filename):
-    ''' Estimate distribution of sequence length and find a reasonable minimum
+    """Estimate distribution of sequence length and find a reasonable minimum
     length.
-    '''
+    """
     from Bio.SeqIO.QualityIO import FastqGeneralIterator
     logging.info('Read input file to record lengths')
     if filename.endswith('.gz'):
@@ -93,7 +97,7 @@ def compute_min_len(filename):
 
 
 def filter_reads(filename, max_n, min_len=49):
-    '''Use seqtk and Biopython to trim and filter low quality reads'''
+    """Use seqtk and Biopython to trim and filter low quality reads"""
     from Bio.SeqIO.QualityIO import FastqGeneralIterator
 
     # run seqtk trimfq to trim low quality ends
@@ -114,9 +118,20 @@ def filter_reads(filename, max_n, min_len=49):
     return oh.name
 
 
-def find_subtype(reads_file, sampled_reads=1000):
-    ''''''
+def find_subtype(reads_file, sampled_reads=1000, recomb=False):
+    """"""
+    import fileinput
     import pandas as pd
+
+    if recomb:
+        ref_files = [HIV_recomb_references, HCV_recomb_references]
+    else:
+        ref_files = [HIV_references, HCV_references]
+
+    sub_ref = 'temp_ref.fasta'
+    with open(sub_ref, 'w') as fout, fileinput.input(ref_files) as fin:
+        for line in fin:
+            fout.write(line)
 
     loc_hit_file = 'loc_res.tsv'
     # columns defined in standard blast output format 6
@@ -138,10 +153,11 @@ def find_subtype(reads_file, sampled_reads=1000):
     # prepare blast to subject sequences
     blast_cmline = 'blastn -task megablast -query sample_hq.fasta -outfmt 6'
     # -num_threads %d' % min(6, CPUS)
-    blast_cmline += ' -subject {} -out {}'.format(shlex.quote(references_file),
+    blast_cmline += ' -subject {} -out {}'.format(shlex.quote(sub_ref),
                                                   loc_hit_file)
     blast = subprocess.Popen(shlex.split(blast_cmline), universal_newlines=True)
     blast.wait()
+    os.remove(sub_ref)
 
     # read blast results and assigns to best subjects
     loc_hits = pd.read_csv(loc_hit_file, names=cols, delimiter="\t")
@@ -152,22 +168,30 @@ def find_subtype(reads_file, sampled_reads=1000):
     support = {'HIV': 0.0, 'HCV': 0.0}
     grouped = loc_hits.groupby(['qseqid'])
     for name, group in grouped:
+        del name
         # take the best matching hit, i.e. the one with max percent identity
         matching = group[group['pident'] == group['pident'].max()]['sseqid']
         # if query has more max matching, shares the weight
         for m in matching:
-            freqs[m] += 1. / len(matching)
-            support[org_dict[m]] += 1. / len(matching)
+            freqs[m] += 1. / (queries * len(matching))
+            support[org_dict[m.split('.')[0]]] += 1. / len(matching)
 
+    max_freq = max(freqs.values())
     organism = max(support, key=support.get)
-    sorted_freqs = sorted(freqs, key=freqs.get, reverse=True)
-    best_subtype = sorted_freqs[0]
-    with open('subtype_evidence.csv', 'w') as oh:
-        for k in sorted_freqs:
-            if freqs[k]:
-                print('%s,%5.4f' % (k, freqs[k]/queries), file=oh)
+    freq2 = {}
+    for k, v in freqs.items():
+        if organism == 'HCV':
+            # replace accession numbers with genotypes
+            gt = hcv_map[k.split('.')[0]]
+        else:
+            # HIV references already have subtypes in the name
+            gt = k
+        freq2[gt] = freq2.get(gt, 0.0) + freqs[k]
+        # save sequence id of best hit
+        if v == max_freq:
+            max_acc = k
 
-    return organism, best_subtype, oh.name
+    return organism, freq2, max_acc
 
     # if best_hit.pident < 97.:
     #     warnings.warn('Low identity (%5.3f)' % best_hit.pident)
@@ -194,10 +218,9 @@ def find_subtype(reads_file, sampled_reads=1000):
     #
     # return
 
-
 def align_reads(ref=None, reads=None, out_file=None, mapper='bwa'):
-    '''Align all high quality reads to found reference with smalt,
-    convert and sort with samtools'''
+    """Align all high quality reads to found reference with smalt,
+    convert and sort with samtools"""
 
     if mapper == 'smalt':
         cml = 'smalt index -k 7 -s 2 cnsref %s' % shlex.quote(ref)
@@ -214,28 +237,23 @@ def align_reads(ref=None, reads=None, out_file=None, mapper='bwa'):
     elif mapper == 'novo':
         cml = 'novoindex cnsref.ndx %s' % ref
         subprocess.call(cml, shell=True)
-        cml = 'novoalign -d cnsref.ndx -f %s -F STDFQ -o SAM > hq_2_cons.sam' %\
-            reads
+        cml = 'novoalign -d cnsref.ndx -f %s -F STDFQ -o SAM > hq_2_cons.sam' \
+        % reads
         subprocess.call(cml, shell=True)
 
     cml = \
         'samtools view -Su hq_2_cons.sam | samtools sort -T /tmp -@ %d -o %s -'\
-            % (min(4, CPUS), out_file)
+        % (min(4, CPUS), out_file)
     subprocess.call(cml, shell=True)
     cml = 'samtools index %s' % out_file
     subprocess.call(cml, shell=True)
-
     os.remove('hq_2_cons.sam')
 
     return out_file
 
 
 def phase_variants(reffile, varfile):
-    '''Parsing variants in varfile (vcf) and applying them to reffile
-    '''
-
-    from Bio.Seq import Seq
-    from Bio.SeqRecord import SeqRecord
+    """Parsing variants in varfile (vcf) and applying them to reffile"""
     # from Bio.Alphabet import generic_dna
 
     # wob = {'AG': 'R', 'CT': 'Y', 'AC': 'M', 'GT': 'K', 'CG': 'S', 'AT': 'W'}
@@ -271,13 +289,13 @@ def phase_variants(reffile, varfile):
                 reflist[pos + i] = r
 
     finalrefseq = ''.join(reflist)
-    fs = SeqRecord(Seq(finalrefseq), id='phased', description='lofreq')
+    fs = SeqRecord(Seq(finalrefseq), id='phased', description='')
     return fs
 
 
 def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
                    mapper='bwa', cons_caller='own'):
-    '''Take reads, align to reference, return consensus file'''
+    """Take reads, align to reference, return consensus file"""
     import glob
     import time
 
@@ -316,7 +334,8 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
         cml = shlex.split('bwa index -p tmpref %s' % shlex.quote(ref_file))
         subprocess.call(cml)
 
-        cml = shlex.split('bwa mem -t %d -O 12 tmpref hq_smp.fastq' % min(CPUS, 12))
+        cml = shlex.split('bwa mem -t %d -O 12 tmpref hq_smp.fastq' %
+                          min(CPUS, 12))
         with open('refcon.sam', 'w') as f:
             subprocess.call(cml, stdout=f)
 
@@ -326,8 +345,10 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
         logging.debug('SAM -> BAM -> SORT')
         cml1 = shlex.split('samtools view -u refcon.sam')
         view = subprocess.Popen(cml1, stdout=subprocess.PIPE)
-        cml2 = shlex.split('samtools sort -T /tmp -@ %d -o refcon_sorted.bam' % min(6, CPUS))
-        sort = subprocess.Popen(cml2, stdin=view.stdout, stdout=subprocess.DEVNULL)
+        cml2 = shlex.split('samtools sort -T /tmp -@ %d -o refcon_sorted.bam' %
+                           min(6, CPUS))
+        sort = subprocess.Popen(cml2, stdin=view.stdout,
+                                stdout=subprocess.DEVNULL)
         view.stdout.close()
         output = sort.communicate()[0]
 
@@ -342,9 +363,12 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
     os.remove('refcon.sam')
     cml = shlex.split('samtools index refcon_sorted.bam')
     subprocess.call(cml)
+    covered_fract, covered_pos = genome_coverage('refcon_sorted.bam')
+    logging.info('%d positions covered', covered_pos)
 
     if cons_caller == 'bcftools':
-        logging.info('mpileup and consensus with bcftools consensus (v1.2 required)')
+        logging.info(
+            'mpileup and consensus with bcftools consensus (v1.2 required)')
         cml = 'samtools mpileup -uf %s refcon_sorted.bam | bcftools call -mv -Ov -o calls.vcf' % ref_file
         subprocess.call(cml, shell=True)
 
@@ -388,37 +412,40 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
         subprocess.call(cml)
 
     SeqIO.write(phased_seq, out_file, 'fasta')
-    return out_file
+    return out_file, covered_fract
 
 
 def iterate_consensus(reads_file, ref_file):
-    ''' Call make_consensus until convergence or for a maximum number of
+    """ Call make_consensus until convergence or for a maximum number of
     iterations
-    '''
+    """
 
     logging.info('First consensus iteration')
     iteration = 1
     # consensus from first round is saved into cns_1.fasta
-    cns_file_1 = make_consensus(ref_file, reads_file,
-                                out_file='cns_%d.fasta' % iteration,
-                                sampled_reads=50000, mapper='blast')
+    cns_file_1, new_cov = make_consensus(
+        ref_file, reads_file, out_file='cns_%d.fasta' % iteration,
+        sampled_reads=5000, mapper='blast')
     try:
         os.rename('calls.vcf.gz', 'calls_%d.vcf.gz' % iteration)
     except FileNotFoundError:
         logging.info('No variants found in making consensus')
-    dh, gaps = compute_dist('cns_%d.fasta' % iteration, ref_file)
-    logging.info('distance = %6.4f percent --- gaps = %d', dh, gaps)
+    dh = compute_dist('cns_%d.fasta' % iteration, ref_file)
+    logging.info('distance = %6.4f percent', dh)
+    logging.info('covered = %6.4f ', new_cov)
 
-    if dh < 1:
+    if dh < 2:
         logging.info('Converged at first step')
         return cns_file_1
 
     while iteration <= 10:
         logging.info('iteration %d', iteration + 1)
         # use cns_1.fasta for further consensus rounds
-        new_cons = make_consensus('cns_%d.fasta' % iteration, reads_file,
-                                  out_file='cns_%d.fasta' % (iteration + 1),
-                                  sampled_reads=50000, mapper='bwa')
+
+        new_cons, new_cov = make_consensus(
+            'cns_%d.fasta' % iteration, reads_file,
+            out_file='cns_%d.fasta' % (iteration + 1),
+            sampled_reads=10000, mapper='bwa')
         try:
             os.rename('calls.vcf.gz', 'calls_%d.vcf.gz' % (iteration + 1))
         except FileNotFoundError:
@@ -427,7 +454,8 @@ def iterate_consensus(reads_file, ref_file):
         iteration += 1
         dh = compute_dist('cns_%d.fasta' % iteration, new_cons)
         logging.info('distance is %6.4f', dh)
-        if dh < 1:
+        logging.info('covered is %6.4f', new_cov)
+        if dh < 2:
             logging.info('converged!')
             break
 
@@ -435,7 +463,8 @@ def iterate_consensus(reads_file, ref_file):
 
 
 def compute_dist(file1, file2):
-    '''Compute the distance between two sequences (given in two files)'''
+    """Compute the distance in percent
+    between two sequences (given in two files)"""
     # alout = 'pair.needle'
     # Alignment.needle_align(file1, file2, alout, go=10, ge=1)
     # ald = Alignment.alignfile2dict([alout])
@@ -453,16 +482,16 @@ def compute_dist(file1, file2):
     cml = shlex.split(
         'blastn -gapopen 20 -gapextend 2 -query %s -subject %s -out pair.tsv -outfmt "6 qseqid sseqid pident gaps"' % (shlex.quote(file1), shlex.quote(file2))
         )
-
     subprocess.call(cml)
     with open('pair.tsv') as h:
         for l in h:
-            ident, gaps = l.split('\t')[2:]
-    return 100 - float(ident), int(gaps)
+            ident = l.split('\t')[2]
+    os.remove('pair.tsv')
+    return 100 - float(ident)
 
 
 def main(read_file=None, max_n_reads=200000):
-    '''What does the main do?'''
+    """What does the main do?"""
     assert os.path.exists(read_file), 'File %s not found' % read_file
 
     min_len = compute_min_len(read_file)
@@ -470,18 +499,55 @@ def main(read_file=None, max_n_reads=200000):
     # locally defined filter_reads writes reads into high_quality.fastq
     filtered_file = filter_reads(read_file, max_n_reads, min_len)
 
-    organism, best_subtype, subtype_file = find_subtype(filtered_file)
+    # infer organism and subtype
+    organism, support_freqs, acc = find_subtype(filtered_file)
+    logging.info('%s sequences detected', organism)
+    try_recomb = False
+    max_support = max(support_freqs.values())
 
-    ref_dict = SeqIO.to_dict(SeqIO.parse(references_file, 'fasta'))
-    ref_rec = SeqRecord(ref_dict[best_subtype].seq,
+    # check if there is better support for recombinant (HCV only)
+    max_support_rec = 0
+    if organism == 'HCV' and max_support < 0.85:
+        try_recomb = True
+        logging.info('Low support in HCV: try recombinant')
+        organism, rec_support_freqs, rec_acc = find_subtype(
+            filtered_file, recomb=True)
+        max_support_rec = max(rec_support_freqs.values())
+
+    if try_recomb and max_support_rec > max_support:
+        logging.info('support improved: using recombinant')
+        sub_file = HCV_recomb_references
+        frequencies = rec_support_freqs
+        s_id = rec_acc
+    else:
+        logging.info('support not improved (or HIV): using non recombinant')
+        sub_file = HCV_references
+        frequencies = support_freqs
+        s_id = acc
+
+    sorted_freqs = sorted(frequencies, key=frequencies.get, reverse=True)
+    best_subtype = sorted_freqs[0]
+
+    with open('subtype_evidence.csv', 'w') as oh:
+        for k in sorted_freqs:
+            if frequencies[k]:
+                print('%s,%5.4f' % (k, frequencies[k]), file=oh)
+
+    ref_dict = SeqIO.to_dict(SeqIO.parse(sub_file, 'fasta'))
+    ref_rec = SeqRecord(ref_dict[s_id].seq,
                         id=best_subtype.split('.')[0], description='')
     SeqIO.write([ref_rec], 'subtype_ref.fasta', 'fasta')
     cns_file = iterate_consensus(filtered_file, 'subtype_ref.fasta')
-    os.rename(cns_file, 'cns_final.fasta')
+    os.rename(cns_file, 'denovo_consensus.fasta')
+    denovo_seq = list(SeqIO.parse('denovo_consensus.fasta', 'fasta'))[0]
+    padded = pad_consensus(denovo_seq, organism, best_subtype)
+    SeqIO.write(SeqRecord(Seq(padded), id='padded_consensus', description=''),
+                'cns_final.fasta', 'fasta')
     cml = shlex.split('samtools faidx cns_final.fasta')
     subprocess.call(cml)
 
-    prepared_file = align_reads(ref='cns_final.fasta', reads=filtered_file, out_file='hq_2_cns_final.bam')
+    prepared_file = align_reads(ref='cns_final.fasta', reads=filtered_file,
+                                out_file='hq_2_cns_final.bam')
 
     return 'cns_final.fasta', prepared_file, organism
 

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-'''Calls lofreq to produce a vcf file'''
+"""Interprets the vcf and translates it into amminoacid mutations."""
 
 import os
 import sys
+import shlex
 import logging
 import warnings
 import subprocess
@@ -16,11 +17,9 @@ from Bio.Seq import Seq
 # from Bio.SeqRecord import SeqRecord
 # from Bio.Alphabet import generic_dna
 
-# manipulate path to import functions
-dn_dir = os.path.dirname(os.path.abspath(__file__))
-os.sys.path.insert(1, dn_dir)
-import Alignment
+from .Alignment import needle_align, alignfile2dict
 
+dn_dir = os.path.dirname(os.path.abspath(__file__))
 RAW_DEPTH_THRESHOLD = 50
 MIN_FRACTION = 0.015
 MAPPING_QUALITY_THRESHOLD = 20
@@ -28,14 +27,18 @@ HAPLO_FREQ_THRESHOLD = 0.015
 
 # nt and amminoacid sequences from files in db directory
 B_pol_nt_seq = list(
-    SeqIO.parse(resource_filename(__name__, 'db/consensus_B.fna'), 'fasta')
+    SeqIO.parse(resource_filename(__name__, 'db/HIV/consensus_B.fna'), 'fasta')
 )[0].seq
 B_pol_aa_seq = list(
-    SeqIO.parse(resource_filename(__name__, 'db/consensus_B.faa'), 'fasta')
+    SeqIO.parse(resource_filename(__name__, 'db/HIV/consensus_B.faa'), 'fasta')
 )[0].seq
 utr_5p_seq = list(
-    SeqIO.parse(resource_filename(__name__, 'db/hcv_utr5.fasta'), 'fasta')
+    SeqIO.parse(resource_filename(__name__, 'db/HCV/hcv_utr5.fasta'), 'fasta')
 )[0].seq
+
+h77_aa_seq = list(
+    SeqIO.parse(resource_filename(__name__, 'db/HCV/H77_polyprotein.faa'),
+                'fasta'))[0].seq
 
 # 64 codons + '---'
 translation_table = {
@@ -57,10 +60,11 @@ info_fields = {}
 
 
 def find_frame(ref):
-    '''Returns frame [1, 2, 3] based on length of longest ORF.
-    It uses gapped translation with the table defined locally, since
-    Biopython does not support it (yet?)'''
+    """Return frame [1, 2, 3] based on length of longest ORF.
 
+    It uses gapped translation with the table defined locally, since
+    Biopython does not support it (yet?).
+    """
     max_len = -1
     # refseq = str(ref)
     refseq = str(ref).replace('-', '').upper()
@@ -89,20 +93,22 @@ def find_frame(ref):
 
 
 def parse_cons_mutations(input_seq, org_found):
-    '''Returns mutations of consensus w.r.t. consensus_B, 1-based
+    """Return mutations of consensus w.r.t. reference.
+
+    It uses consensus_B for HIV, subtypre_ref.fasta for HCV. 1-based
     coordinate on input sequence because we need to phase minority calls
     later.
-    '''
+    """
     logging.info('parsing consensus mutations for organism %s', org_found)
     if org_found == 'HIV':
         org_ref = str(B_pol_nt_seq)
     elif org_found == 'HCV':
         sub_ref_nt_seq = list(SeqIO.parse('subtype_ref.fasta', 'fasta'))[0].seq
         org_ref = str(sub_ref_nt_seq)
-    Alignment.needle_align('asis:%s' % org_ref,
+    needle_align('asis:%s' % org_ref,
                            'asis:%s' % str(input_seq.seq), 'h.tmp',
                            go=40.0, ge=5.0)
-    alhr = Alignment.alignfile2dict(['h.tmp'])
+    alhr = alignfile2dict(['h.tmp'])
     os.remove('h.tmp')
     alih = alhr['asis']['asis']
     alih.summary()
@@ -141,10 +147,11 @@ def parse_cons_mutations(input_seq, org_found):
 
 
 def parsevar(vcf_file, ref_file):
-    '''Parses mutations in vcf file, checks the effect on the translation and
-    returns them together with frequencies.
-    '''
+    """Parse mutations in vcf file.
 
+    This also checks the effect on the translation and
+    returns them together with frequencies.
+    """
     import re
     from itertools import zip_longest
     # pass on the file, saving info fields too
@@ -209,7 +216,9 @@ def parsevar(vcf_file, ref_file):
 
 
 def merge_mutations(cons_muts, vcf_muts):
-    '''Mutations found on sample consensus w.r.t. organism consensus and
+    """Merge mutations on samples consensus with those in vcf file.
+
+    Mutations found on sample consensus w.r.t. organism consensus and
     minority ones found w.r.t. sample consensus must be merged to represent
     true state of variants w.r.t. consensus B. For all, position is on sample
     consensus
@@ -241,7 +250,7 @@ def merge_mutations(cons_muts, vcf_muts):
     In position 7 we only have a mutation on sample consensus, so we only
     report
     T, 7, A, 1.0
-    '''
+    """
     case = {}
     # pos can be index on cns_mutations because they are unique
     cons_muts.set_index(['pos'], inplace=True, verify_integrity=True)
@@ -281,12 +290,14 @@ def merge_mutations(cons_muts, vcf_muts):
 
 
 def phase_mutations(muts, frame, bam_file):
-    '''Looks for mutations affecting the same codon and checks on the reads
-    whether they really occur together
-    '''
-    import shlex
+    """Phase mutations affecting the same codon.
+
+    If mutations appear on the same codon, it checks on the reads whether they
+    really occur together.
+    """
     from operator import itemgetter
 
+    logging.info('looking for mutations on the same codon to be phased')
     # find mutation positions appearing together in a codon, save in targets
     pm = pd.DataFrame(columns=['wt', 'pos', 'mut', 'freq'])
     # mut_pos = set(muts.pos)
@@ -341,12 +352,13 @@ def phase_mutations(muts, frame, bam_file):
         if len(mut_over) > 1:
             targets.append((i, i + 2))
 
+    logging.info('%d targets found', len(targets))
     # count three base haplotypes with samtools
     for t in targets:
         haps = {}
         coverage = 0
         cml = shlex.split(
-            'samtools view %s phased:%d-%d' % (bam_file, t[0], t[1]))
+            'samtools view %s padded_consensus:%d-%d' % (bam_file, t[0], t[1]))
         proc = subprocess.Popen(cml, stdout=subprocess.PIPE,
                                 universal_newlines=True)
         with proc.stdout as handle:
@@ -360,7 +372,7 @@ def phase_mutations(muts, frame, bam_file):
                 reg = read[t[0] - pos:t[0] - pos + 3]
                 haps[reg] = haps.get(reg, 0) + 1
                 coverage += 1
-
+        logging.info('position:%d', t[0])
         for k, v in sorted(haps.items(), key=itemgetter(1), reverse=True):
             freq_here = float(v) / coverage
             if freq_here > HAPLO_FREQ_THRESHOLD and len(k) > 1:
@@ -371,7 +383,7 @@ def phase_mutations(muts, frame, bam_file):
                         pass
                 d_here = {'wt': 'XYZ', 'pos': t[0], 'mut': k, 'freq': freq_here}
                 pm = pm.append(d_here, ignore_index=True)
-                logging.info('%s %f %d', k, freq_here, t[0])
+                logging.info('hap: %s freq:%f', k, freq_here)
         logging.info('<------>')
     muts = muts.reset_index()
     pm = pm.reset_index()
@@ -384,16 +396,18 @@ def phase_mutations(muts, frame, bam_file):
 
 
 def extract_hcv_orf(gen_ref_seq):
-    '''HCV genome starts with a 341 nt 5'UTR region that is quite well
+    """Extract the HCV ORF from the given sequence.
+
+    HCV genome starts with a 341 nt 5'UTR region that is quite well
     conserved. After this region starts the long ORF where all
     proteins are encoded. This function cuts the input sequence from
     the beginning of the ORF to the end of the genome by aligning to
     the 5'UTR sequence.
-    '''
-    Alignment.needle_align(
+    """
+    needle_align(
         'asis:%s' % str(utr_5p_seq), 'asis:%s' % str(gen_ref_seq),
         'z.tmp', go=40.0, ge=5.0)
-    alhr = Alignment.alignfile2dict(['z.tmp'])
+    alhr = alignfile2dict(['z.tmp'])
     os.remove('z.tmp')
     alih = alhr['asis']['asis']
     alih.summary()
@@ -404,7 +418,9 @@ def extract_hcv_orf(gen_ref_seq):
 
 
 def annotate_mutations(mutations, ref, org_found):
-    '''Takes a DataFrame with nucleotide mutations and translates and
+    """Write gene, position, wild type, mutation, frequency in a data frame.
+
+    Takes a DataFrame with nucleotide mutations and translates and
     annotates them according to coordinates in consensus B genes.
     Position on mutations is on ref (sample consensus), so we need to
     report these onto consensus B or HCV reference.
@@ -413,8 +429,7 @@ def annotate_mutations(mutations, ref, org_found):
     This function works on both HIV and HCV, but the naming of the
     variables reflect the fact that it was written for HIV only at the
     beginning.
-    '''
-
+    """
     anno_variants = pd.DataFrame(columns=['gene', 'pos', 'wt', 'mut', 'freq'])
     if mutations.empty:
         return anno_variants
@@ -431,10 +446,10 @@ def annotate_mutations(mutations, ref, org_found):
         del orf_seq
         del frame
 
-    Alignment.needle_align('asis:%s' % str(B_nt),
-                           'asis:%s' % str(ref_nt), 'h.tmp',
-                           go=40.0, ge=5.0)
-    alhr = Alignment.alignfile2dict(['h.tmp'])
+    needle_align('asis:%s' % str(B_nt),
+                 'asis:%s' % str(ref_nt), 'h.tmp',
+                 go=40.0, ge=5.0)
+    alhr = alignfile2dict(['h.tmp'])
     os.remove('h.tmp')
     alih = alhr['asis']['asis']
     alih.summary()
@@ -505,35 +520,102 @@ def annotate_mutations(mutations, ref, org_found):
     return anno_variants
 
 
+def hcv_gene_map(polyprot):
+    """Align translated reference to H77 protein and save mapping."""
+    cmls = 'needle asis:%s asis:%s' % (h77_aa_seq, polyprot)
+    cmls += ' -gapopen 20.0 -gapextend 2.0'
+    cmls += ' -outfile h77_pol_al.fasta -aformat3 fasta'
+    cml = shlex.quote(cmls)
+    # shell needed because arguments are very long
+    subprocess.call(cml, shell=True)
+    hal = list(SeqIO.parse('h77_pol_al.fasta', 'fasta'))
+    h77, smp = hal[0].seq, hal[1].seq
+    # this code is liberally taken from Alignment
+    h77_pos = 0
+    smp_pos = 0
+    start = len(h77) - len(str(h77).lstrip('-'))
+    stop = len(str(h77).rstrip('-'))
+    it_pair = zip(h77[start:stop], smp[start:stop])
+    h77_map = {}
+    while True:
+        try:
+            p = next(it_pair)
+        except StopIteration:
+            break
+        if p is None:
+            print('why none?')
+            break
+        if p == ('-', '-'):
+            warnings.warn('double gap!')
+        if p[0] != '-':
+            h77_pos += 1
+        if p[1] != '-':
+            smp_pos += 1
+        h77_map[smp_pos] = h77_pos
+
+    return h77_map
+
 def gene_map(pos, org_found, orf_pos=0):
-    ''' Returns the gene name and the position on the gene of a codon found
-    '''
-
+    """Return the gene name and the position on the gene of a codon found."""
+    print(pos, org_found, orf_pos)
     if org_found == 'HCV':
-        return 'unknown', pos - int(orf_pos / 3)
+        pos -= int(orf_pos / 3)
+        if 1 <= pos and pos <= 191:
+            gene_name = 'C'
+            gene_pos = pos
+        elif 192 <= pos and pos <= 383:
+            gene_name = 'E1'
+            gene_pos = pos - 191
+        elif 384 <= pos and pos <= 746:
+            gene_name = 'E2'
+            gene_pos = pos - 383
+        elif 747 <= pos and pos <= 809:
+            gene_name = 'p7'
+            gene_pos = pos - 746
+        elif 810 <= pos and pos <= 1026:
+            gene_name = 'NS2'
+            gene_pos = pos - 809
+        elif 1027 <= pos and pos <= 1657:
+            gene_name = 'NS3'
+            gene_pos = pos - 1026
+        elif 1658 <= pos and pos <= 1711:
+            gene_name = 'NS4A'
+            gene_pos = pos - 1657
+        elif 1712 <= pos and pos <= 1972:
+            gene_name = 'NS4B'
+            gene_pos = pos - 1711
+        elif 1973 <= pos and pos <= 2420:
+            gene_name = 'NS5A'
+            gene_pos = pos - 1972
+        elif 2421 <= pos and pos <= 3011:
+            gene_name = 'NS5B'
+            gene_pos = pos - 2420
+        else:
+            gene_name = "3'UTR"
+            gene_pos = pos - 3011
 
-    if pos <= 56:
-        gene_name = 'GagPolTF'
-        gene_pos = pos
-    elif 57 <= pos and pos <= 155:
-        gene_name = 'protease'
-        gene_pos = pos - 56
-    elif 156 <= pos and pos <= 595:
-        gene_name = 'RT'
-        gene_pos = pos - 155
-    elif 596 <= pos and pos <= 715:
-        gene_name = 'RNase'
-        gene_pos = pos - 595
-    elif 716 <= pos and pos <= 1003:
-        gene_name = 'integrase'
-        gene_pos = pos - 715
+    if org_found == 'HIV':
+        if pos <= 56:
+            gene_name = 'GagPolTF'
+            gene_pos = pos
+        elif 57 <= pos and pos <= 155:
+            gene_name = 'protease'
+            gene_pos = pos - 56
+        elif 156 <= pos and pos <= 595:
+            gene_name = 'RT'
+            gene_pos = pos - 155
+        elif 596 <= pos and pos <= 715:
+            gene_name = 'RNase'
+            gene_pos = pos - 595
+        elif 716 <= pos and pos <= 1003:
+            gene_name = 'integrase'
+            gene_pos = pos - 715
 
     return gene_name, gene_pos
 
 
 def main(vcf_file=None, ref_file=None, bam_file=None, organism=None):
-    ''' What does the main do?
-    '''
+    """What the main does."""
     # ref_file is the sample consensus
     # parse mutations already found in the sample consensus wrt to
     # organism reference (consensus B pol gene for HIV)
@@ -597,4 +679,5 @@ def main(vcf_file=None, ref_file=None, bam_file=None, organism=None):
         'annotated_mutations.csv', sep=',', float_format='%6.4f', index=False)
 
 if __name__ == '__main__':
-    main(sys.argv[1])
+    main('hq_2_cns_final_recal.vcf', 'cns_final.fasta',
+         'hq_2_cns_final_recal.bam', sys.argv[1])
