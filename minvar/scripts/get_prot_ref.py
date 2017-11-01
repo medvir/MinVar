@@ -37,7 +37,7 @@ h77_locations = {
     'ns5a': (1972, 2420),
     'ns5b': (2420, 3011)
 }
-h77_file = os.path.join(parent_dir, 'db/HCV/H77_polyprotein.faa')
+
 target_prots = ['ns3', 'ns4a', 'ns4b', 'ns5a', 'ns5b']
 
 
@@ -70,16 +70,18 @@ def extract_protein(polyprotein_file, prot):
 def split_h77():
     """Make all H77 proteins."""
     print('Splitting H77')
-    if not os.path.exists(h77_file):
-        cml = 'efetch -db nuccore -format fasta -id AAB67038.1'
-        with open(h77_file, 'w') as f:
+    h77_aa_file = os.path.join(parent_dir, 'db/HCV/H77_polyprotein.faa')
+    if not os.path.exists(h77_aa_file):
+        cml = 'efetch -db nuccore -format fasta -id AAB66324.1'
+        with open(h77_aa_file, 'w') as f:
             subprocess.call(shlex.split(cml), stdout=f)
-    h77_poly = list(SeqIO.parse(h77_file, 'fasta'))[0]
+    h77_poly = list(SeqIO.parse(h77_aa_file, 'fasta'))[0]
     for k, v in h77_locations.items():
         sta, sto = v
-        s_id = '%s_h77' % k
+        s_id = '%s_h77.faa' % k
+        fpath = os.path.join(parent_dir, 'db/HCV/%s' % s_id)
         sr1 = SeqRecord(h77_poly[sta:sto].seq, id=s_id, description='')
-        SeqIO.write(sr1, s_id + '.faa', 'fasta')
+        SeqIO.write(sr1, fpath, 'fasta')
 
 
 def make_subtype_proteins(poly_files):
@@ -93,7 +95,9 @@ def make_subtype_proteins(poly_files):
             sr2 = SeqRecord(Seq(xt_prot),
                             id='genotype_%s_%s_%s' % (gt, target_prot, ac),
                             description='')
-            SeqIO.write(sr2, '%s_%s.faa' % (target_prot, gt), 'fasta')
+            fpath = os.path.join(parent_dir,
+                                 'db/HCV/%s_%s.faa' % (target_prot, gt))
+            SeqIO.write(sr2, fpath, 'fasta')
 
 
 def get_all_polyproteins():
@@ -123,7 +127,7 @@ def get_all_polyproteins():
 
 
 def get_references():
-    """Download HCV references defined in common.py."""
+    """Download HCV references defined in common.py plus H77."""
     from pprint import pprint
     genotype = {}
     sub_list = []
@@ -139,13 +143,24 @@ def get_references():
                 print("Don't know what to do!")
     pprint(genotype)
 
-    cml = 'efetch -db nuccore -format fasta -id \"%s\"' % ','.join(sub_list)
-    cml += ' > subtype_references.fasta'
-    subprocess.call(cml, shell=True)
-    cml = 'efetch -db nuccore -format fasta -id \"%s\"' % ','.join(rec_list)
-    cml += ' > recomb_references.fasta'
-    subprocess.call(cml, shell=True)
+    sub_path = os.path.join(parent_dir, 'db/HCV/subtype_references.fasta')
+    if not os.path.exists(sub_path):
+        cml = 'efetch -db nuccore -format fasta -id \"%s\"' % ','.join(sub_list)
+        with open(sub_path, 'w') as f:
+            subprocess.call(shlex.split(cml), stdout=f)
 
+    rec_path = os.path.join(parent_dir, 'db/HCV/recomb_references.fasta')
+    if not os.path.exists(rec_path):
+        cml = 'efetch -db nuccore -format fasta -id \"%s\"' % ','.join(rec_list)
+        with open(rec_path, 'w') as f:
+            subprocess.call(shlex.split(cml), stdout=f)
+
+    h77_nt_file = os.path.join(parent_dir, 'db/HCV/H77_cds.fna')
+    if not os.path.exists(h77_nt_file):
+        cml = 'efetch -db nuccore -format fasta -id AF009606.1'
+        cml += ' -seq_start 342 -seq_stop 9374'
+        with open(h77_nt_file, 'w') as f:
+            subprocess.call(shlex.split(cml), stdout=f)
 
 if __name__ == '__main__':
     split_h77()
