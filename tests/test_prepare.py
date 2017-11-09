@@ -1,65 +1,95 @@
 #!/usr/bin/env python3
 
 import os
-import sys
-import unittest
 import tempfile
 
+import pytest
+from Bio import SeqIO
+
+from src.minvar.prepare import (compute_min_len, find_subtype,
+                                iterate_consensus, pad_consensus)
+
 minvar_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-os.sys.path.insert(1, minvar_dir)
-mod = __import__('minvar')
-sys.modules["minvar"] = mod
-
-from minvar.prepare import compute_min_len, filter_reads, iterate_consensus, find_subtype
-
-
-class Test_compute_min_len(unittest.TestCase):
-
-    def setUp(self):
-        self.hiv_fastq = '/Users/ozagordi/hiv_small.fastq.gz'
-
-    def test_minlen_one(self):
-        m = compute_min_len(self.hiv_fastq)
-        self.assertGreater(m, 49)
+cbfile = os.path.join(minvar_dir, 'src/minvar/db/HIV/consensus_B.fna')
+hiv_middle = list(SeqIO.parse(cbfile, 'fasta'))[0]
+rec_hcv_file = os.path.join(minvar_dir,
+                            'src/minvar/db/HCV/recomb_references.fasta')
+hcv_middle = list(SeqIO.parse(rec_hcv_file, 'fasta'))[0]
 
 
-class Test_iterate_consensus(unittest.TestCase):
+# @pytest.mark.skip(reason="no way of currently testing this")
+def test_HIV_length():
+    # a sequence from the middle of the reference
+    m = pad_consensus(hiv_middle[100:500], 'HIV', 'whatever')
+    assert len(m) == 3012
+    # from the beginning
+    m = pad_consensus(hiv_middle[:500], 'HIV', 'whatever')
+    assert len(m) == 3012
+    # from the end
+    m = pad_consensus(hiv_middle[-500:], 'HIV', 'whatever')
+    assert len(m) == 3012
+    # longer on the left
+    lotl = 'AGACTAGCCGATCAGCATCAGCA' + hiv_middle[:100]
+    m = pad_consensus(lotl, 'HIV', 'whatever')
+    assert len(m) == 3012
+    # longer on the right
+    lotl = hiv_middle[-100:] + 'AAGCGCATCGACATCAGCA'
+    m = pad_consensus(lotl, 'HIV', 'whatever')
+    assert len(m) == 3012
 
-    def setUp(self):
-        self.tmpdir = tempfile.gettempdir()
-        self.hiv_fastq = '/Users/ozagordi/hiv_small.fastq.gz'
-        self.hiv_ref = '/Users/ozagordi/References/HIV-HXB2-pol.fasta'
-        #self.hcv_ref = '/Users/ozagordi/References/HIV-HXB2-pol.fasta'
+
+@pytest.mark.skip(reason="no way of currently testing this")
+def test_HCV_recomb_length():
+    m = pad_consensus(hcv_middle, 'HCV', 'RF1_2k/1b')
+    assert len(m) == 9357
+
+    m = pad_consensus(hcv_middle[:256], 'HCV', 'RF1_2k/1b')
+    assert len(m) == 9357
+
+    m = pad_consensus(hcv_middle[-256:], 'HCV', 'RF1_2k/1b')
+    assert len(m) == 9357
+
+
+def test_compute_min_len():
+    """Test minimum length"""
+    hiv_fastq = '/Users/ozagordi/hiv_small.fastq.gz'
+    m = compute_min_len(hiv_fastq)
+    assert m > 49
+
+
+@pytest.mark.skip(reason="skipping iterate_consensus")
+def test_iterate_consensus():
+
+    tmpdir = tempfile.gettempdir()
+    hiv_fastq = '/Users/ozagordi/hiv_small.fastq.gz'
+    hiv_ref = '/Users/ozagordi/References/HIV-HXB2-pol.fasta'
+    # hcv_ref = '/Users/ozagordi/References/HIV-HXB2-pol.fasta'
 
     # def test_filter_only(self):
-    #     os.chdir(self.tmpdir)
-    #     hq = filter_reads(self.hiv_fastq, 1000, 50)
-    #     self.assertIsInstance(hq, str)
+    #     os.chdir(tmpdir)
+    #     hq = filter_reads(hiv_fastq, 1000, 50)
+    #     assertIsInstance(hq, str)
 
-    def test_iterate_consensus(self):
-        os.chdir(self.tmpdir)
-        cons = iterate_consensus(self.hiv_fastq, self.hiv_ref)
-        self.assertIsInstance(cons, str)
+    os.chdir(tmpdir)
+    cons = iterate_consensus(hiv_fastq, hiv_ref)
+    assert isinstance(cons, str)
 
 
-class Test_find_subtype(unittest.TestCase):
+@pytest.mark.skip("skipping find_subtype")
+def test_find_subtype():
 
-    def setUp(self):
-        self.tmpdir = '/tmp/ppp' #tempfile.gettempdir()
-        self.hiv_fastq = '/Users/ozagordi/hiv_small.fastq.gz'
-        self.hcv_fastq = '/Users/ozagordi/hcv_small.fastq.gz'
+    tmpdir = tempfile.gettempdir()
+    hiv_fastq = '/Users/ozagordi/hiv_small.fastq.gz'
+    hcv_fastq = '/Users/ozagordi/hcv_small.fastq.gz'
 
-    def test_hiv(self):
-        os.chdir(self.tmpdir)
-        org, bs, sf = find_subtype(self.hiv_fastq)
-        self.assertEqual(org, 'HIV')
-        self.assertEqual(bs, 'CONSENSUS_B')
+    # test hiv
+    os.chdir(tmpdir)
+    org, bs, sf = find_subtype(hiv_fastq)
+    assert org == 'HIV'
+    assert bs == 'CONSENSUS_B'
 
-    def test_hcv(self):
-        os.chdir(self.tmpdir)
-        org, bs, sf = find_subtype(self.hcv_fastq)
-        self.assertEqual(org, 'HCV')
-        self.assertEqual(bs, 'M62321.1')
-
-if __name__ == '__main__':
-    unittest.main()
+    # test hcv
+    os.chdir(tmpdir)
+    org, bs, sf = find_subtype(hcv_fastq)
+    assert org == 'HCV'
+    assert bs == 'M62321.1'

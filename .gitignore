@@ -9,4 +9,6 @@ MinVar.egg-info/
 build/
 dist/
 files.txt
-
+.tox/
+minvarenv/
+.cache/
