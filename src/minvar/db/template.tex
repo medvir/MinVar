@@ -1,0 +1,101 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Press Release
+% LaTeX Template
+% Version 1.0 (2/6/13)
+%
+% This template has been downloaded from:
+% http://www.LaTeXTemplates.com
+%
+% Original author:
+% Vel (vel@latextemplates.com)
+%
+% License:
+% CC BY-NC-SA 3.0 (http://creativecommons.org/licenses/by-nc-sa/3.0/)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%------------------------------------------------------------------------------
+%	PACKAGES AND OTHER DOCUMENT CONFIGURATIONS
+%------------------------------------------------------------------------------
+
+\documentclass[11pt,pressrelease]{newlfm} % Font size
+
+\usepackage{charter} % Use the Charter font for the document text
+
+$if(tables)$
+\usepackage{longtable,booktabs}
+$endif$
+
+%\usepackage{titlesec}
+
+\PhrPhone{Phone} % Customize the "Telephone" text
+\PhrEmail{Email} % Customize the "E-mail" text
+%\PhrContact{Contact} % Uncomment this line to change the 'Contact:' text
+
+% newlfm does not define subsection
+\newcounter{section}
+\newcounter{subsection}[section]
+\setcounter{secnumdepth}{0}
+
+\makeatletter
+\renewcommand\section{\@startsection {section}{1}{\z@}%
+                                   {-3.5ex \@plus -1ex \@minus -.2ex}%
+                                   {2.3ex \@plus.2ex}%
+                                   {\normalfont\Large\bfseries}}
+\newcommand\subsection{\clearpage\@startsection{subsection}{2}{\z@}%
+                                     {-3.25ex\@plus -1ex \@minus -.2ex}%
+                                     {1.5ex \@plus .2ex}%
+                                     {\normalfont\large\bfseries}}
+\renewcommand\thesection{\@arabic\c@section}
+\renewcommand\thesubsection{\thesection.\@arabic\c@subsection}
+
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
+\makeatother
+
+
+%------------------------------------------------------------------------------
+%	PRESS RELEASE INFORMATION
+%------------------------------------------------------------------------------
+
+% Include a company logo, if you don't use one you will need to uncomment
+% line 6 in the prsrls.tex file
+%\makeletterhead{Uiuc}{\Cheader{\vspace{16pt}\includegraphics[width=0.5\linewidth]{logo.png}}}
+
+%\lthUiuc % Print the company/institution logo
+
+\release{Release} % When the press release may be used
+
+\namefrom{John Smith} % Name
+
+\addrfrom{ % From address
+IMV\\
+Irgendwo \\
+CH-80XX Z\"urich
+}
+
+\phonefrom{(+41) 123-45-67} % Phone number
+
+\emailfrom{jemand@uzh.ch} % Email address
+
+\headline{This is the Headline} % Headline for the press release
+
+\newcommand{\subtitle}{This is a subtitle to the headline giving more
+information about the headline.}
+% Subtitle for the press release, if you don't want one just remove the
+% subtitle text leaving the rest of the command
+
+\byline{\textbf{City, Country -- \today ~--} Summary/overview of facts
+including who, what, where, when as well as why the press should care enough to
+write about this.} % A summary line for the press release
+
+%------------------------------------------------------------------------------
+
+\begin{document}
+\begin{newlfm}
+
+$body$
+
+\end{newlfm}
+\end{document}
