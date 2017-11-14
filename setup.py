@@ -13,11 +13,12 @@ setuptools.setup(
     url='https://github.com/ozagordi/MinVar',
     author='Osvaldo Zagordi',
     author_email='firstname.lastname@gmail.com',
-    packages=setuptools.find_packages(),
+    packages=setuptools.find_packages('src'),
     scripts=['bin/minvar', 'src/scripts/blast2sam.py'],
-    package_dir={'minvar': 'src/minvar'},
+    #package_dir={'minvar': 'src/minvar'},
+    package_dir={'': 'src'},
     package_data={'minvar': ['db/*']},
     entry_points={
-        'console_scripts': ['minvar = minvar.__main__:main']
+        'console_scripts': ['minvar = minvar.cli:main']
         }
 )

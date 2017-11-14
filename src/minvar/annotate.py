@@ -11,6 +11,7 @@ import warnings
 import pandas as pd
 from Bio import SeqIO
 from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
 
 dn_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if __name__ == '__main__':
@@ -27,6 +28,7 @@ else:
 
 RAW_DEPTH_THRESHOLD = 50
 MIN_FRACTION = 0.015
+VARIANT_QUALITY_THRESHOLD = 80
 MAPPING_QUALITY_THRESHOLD = 20
 HAPLO_FREQ_THRESHOLD = 0.015
 
@@ -96,8 +98,7 @@ def find_frame(ref):
         return best_frame, Seq(refseq[best_frame - 1:-to_trim]),\
             aa_seq[best_frame].strip('*')
 
-    return best_frame, Seq(refseq[best_frame - 1:]),\
-        aa_seq[best_frame].strip('*')
+    return best_frame, aa_seq[best_frame].strip('*')
 
 
 def parse_cons_mutations(input_seq, org_found):
@@ -199,11 +200,9 @@ def parse_cons_mutations(input_seq, org_found):
 def parsevar(vcf_file, ref_seq):
     """Parse mutations in vcf file.
 
-    This also checks the effect on the translation and
-    returns them together with frequencies.
+    This returns mutations in a pandas DataFrame.
     """
     import re
-    from itertools import zip_longest
     # pass on the file, saving info fields too
     prog = re.compile('##INFO=<ID=(.*),Number.*,Description="(.*)">')
     vc_lines = []
@@ -220,24 +219,24 @@ def parsevar(vcf_file, ref_seq):
 
     # ref_seq = list(SeqIO.parse(ref_file, 'fasta'))[0]
     # frame, nt_framed, aa_framed = find_frame(ref_seq)
-    ref_nt = str(ref_seq)
-
+    ref_nt = str(ref_seq.seq)
     vcf_mutations = pd.DataFrame(columns=['wt', 'pos', 'mut', 'freq'])
     # vcf_mutations = vcf_mutations.set_index(['gene', 'pos', 'mut'])
     # now parses the variants
     for vc_line in vc_lines:
         lsp = vc_line.strip().split('\t')
-        if float(lsp[5]) < 100:
-            logging.warning('Quality filter on position %s: qual=%s',
-                            lsp[1], lsp[5])
+        if float(lsp[5]) < VARIANT_QUALITY_THRESHOLD:
+            logging.warning('Quality filter on position %s: qual=%s', lsp[1], lsp[5])
             continue
 
-        # assert lsp[0] == ref_seq.id, 'sequence ID not matching'
         pos = int(lsp[1])
         wt_nt, alt = lsp[3:5]
-        assert ref_nt[pos - 1] == wt_nt[0], 'ref shift: %s not %s' % \
-            (ref_nt[pos - 1], wt_nt)
-
+        try:
+            assert ref_nt[pos - 1] == wt_nt[0], 'ref shift: %s not %s at pos %s' % (ref_nt[pos - 1], wt_nt, pos)
+        except IndexError:
+            print(ref_nt[pos - 10:pos + 10])
+            print('problem at pos %s, wt_nt:%s' % (pos, wt_nt))
+            sys.exit()
         infos = {}
         for a in lsp[7].split(';'):
             asp = a.split('=')
@@ -246,26 +245,70 @@ def parsevar(vcf_file, ref_seq):
             except IndexError:
                 infos[asp[0]] = None
 
+        # loop because multiple variants can be found on the same vcf line
         for alt_nt, alt_f in zip(alt.split(','), infos['AF'].split(',')):
-            if len(alt_nt) != len(wt_nt):  # indel
-                logging.info('indel found at pos %d', pos)
-                indel = zip_longest(wt_nt, alt_nt, fillvalue='-')
-                for i, b in enumerate(indel):
-                    if b[0] != b[1]:
-                        pm_here = {'wt': b[0], 'pos': pos + i, 'mut': b[1],
-                                   'freq': float(alt_f)}
-                        vcf_mutations = vcf_mutations.append(
-                            pm_here, ignore_index=True)
-            else:
-                pm_here = {
-                    'wt': wt_nt, 'pos': pos, 'mut': alt_nt, 'freq': float(alt_f)
-                    }
-                vcf_mutations = vcf_mutations.append(pm_here, ignore_index=True)
+            if len(alt_nt) > len(wt_nt):  # insertion
+                logging.info('insertion found at pos %d', pos)
+                # pm_here = {'wt': wt_nt, 'pos': pos, 'mut': alt_nt, 'freq': float(alt_f)}
+                # vcf_mutations = vcf_mutations.append(pm_here, ignore_index=True)
+            elif len(alt_nt) < len(wt_nt):  # deletion
+                logging.info('deletion found at pos %d', pos)
+                # indel = zip_longest(wt_nt, alt_nt, fillvalue='-')
+                # for i, b in enumerate(indel):
+                #     pm_here = {'wt': b[0], 'pos': pos + i, 'mut': b[1], 'freq': float(alt_f)}
+                #     vcf_mutations = vcf_mutations.append(pm_here, ignore_index=True)
+            pm_here = {'wt': wt_nt, 'pos': pos, 'mut': alt_nt, 'freq': float(alt_f)}
+            vcf_mutations = vcf_mutations.append(pm_here, ignore_index=True)
+
     vcf_mutations['pos'] = vcf_mutations['pos'].astype(int)
     return vcf_mutations
 
 
-def merge_mutations(cons_muts, vcf_muts):
+def merge_mutations(cns_muts, vcf_muts):
+    """Merge reference bases with mutations found in a vcf file.
+
+    Bases found on reference are passed as a DataFrame with pos/mut columns
+    and frequency is intended 100%. Mutations found in vcf have a frequency
+    column, so that when a mutation is found, its frequency is subtracted
+    from the reference base.
+    e.g. at position pos=123 consensus has T and vcf reports a T->C at 25%.
+    The final table will have
+    pos    mut    freq
+    123     T     0.75
+    123     C     0.25
+    """
+    mutated_pos = set(vcf_muts.pos)
+    unmutated_pos = set(cns_muts.pos) - mutated_pos
+    # save the unmutated positions
+    unmutated = cns_muts[cns_muts.pos.isin(unmutated_pos)]
+    # now add the mutated positions
+    save_pos = []
+    save_freq = []
+    save_mut = []
+    for pos in sorted(mutated_pos):
+        variants_here = vcf_muts[vcf_muts.pos == pos]
+        cumulative = variants_here.freq.sum()
+        # save first what is found on consensus minus frequency of all vcf mutations
+        save_pos.append(pos)
+        save_freq.append(1. - cumulative)
+        save_mut.append(cns_muts[cns_muts.pos == pos].mut.tolist()[0])
+
+        # now iterate on mutations
+        save_pos.extend(variants_here.pos.tolist())
+        save_freq.extend(variants_here.freq.tolist())
+        save_mut.extend(variants_here.mut.tolist())
+        # for row in variants_here.itertuples():
+        #     save_pos.append(getattr(row, 'pos'))
+        #     save_freq.append(getattr(row, 'freq'))
+        #     save_mut.append(getattr(row, 'mut'))
+    mutated = pd.DataFrame({'pos': save_pos, 'freq': save_freq, 'mut': save_mut})
+    merged = pd.concat([unmutated, mutated])
+    merged = merged[merged.freq > 0]
+    merged = merged.sort_values(by=['pos', 'freq'], ascending=[True, False])
+    return merged
+
+
+def old_merge_mutations(cons_muts, vcf_muts):
     """Merge mutations on samples consensus with those in vcf file.
 
     Mutations found on sample consensus w.r.t. organism consensus and
@@ -470,9 +513,9 @@ def extract_hcv_orf(gen_ref_seq):
 
 def get_align_map(ref_nt, B_nt):
 
-    frame, framed_nt, framed_aa = find_frame(ref_nt)
+    frame, framed_aa = find_frame(ref_nt)
     del frame
-    del framed_nt
+
     # build map of sample consensus to DRM/RAS reference
     needle_align('asis:%s' % str(B_nt.translate()),
                  'asis:%s' % str(framed_aa), 'h.tmp',
@@ -695,69 +738,301 @@ def HIV_gene_map(pos):
     return gene_name, gene_pos
 
 
-def main(vcf_file=None, ref_file=None, bam_file=None, organism=None):
+def compute_org_mutations(aa_sequence, org_found):
+    """Compute mutation profile and mapping of a protein sequence.
+
+    This function takes a protein sequence aa_sequence, aligns it to
+    reference depending on org_found (H77 for org_found=HCV,
+    consensus_B for org_found=HIV) and returns a DataFrame where, on
+    each row, are
+    - wt: amminoacid on organism sequence,
+    - pos: position on the organism sequence,
+    - mut: amminoacid on aa_sequence,
+    - in_pos: position on aa_sequence
+    """
+    import re
+    if org_found == 'HIV':
+        org_ref = B_pol_aa_seq
+    elif org_found == 'HCV':
+        org_ref = h77_aa_seq
+
+    needle_align('asis:%s' % org_ref, 'asis:%s' % aa_sequence, 'parse.tmp')  # go=go, ge=ge)
+    alhr = alignfile2dict(['parse.tmp'])
+    alih = alhr['asis']['asis']
+    alih.summary()
+    if 3 * alih.mismatches > alih.ident:
+        warnings.warn('Too many mismatches in parsing mutations')
+#    else:
+#        os.remove('parse.tmp')
+
+    # the naming of variables here below (B_seq, end_B, ...) stems from the
+    # fact that, originally, only HIV consensus_B was used
+    org_seq, in_seq = alih.seq_a.upper(), alih.seq_b.upper()
+    end_org, end_in = len(org_seq.rstrip('-')), len(in_seq.rstrip('-'))
+    end_pos = min(end_org, end_in)
+
+    # here_muts = pd.DataFrame(columns=['wt', 'pos', 'mut'])
+    # these will count positions on wt, mutated sequence and matching positions
+    org_pos = 0
+    in_pos = 0
+    i = 0
+    nmuts = 0
+    wt_save = []
+    pos_save = []
+    in_save = []
+    mut_save = []
+    # first pass does not parse indels
+    al_pairs = list(zip(org_seq[:end_pos], in_seq[:end_pos]))
+    for j, z in enumerate(al_pairs[:end_pos - 1]):
+        org_pos += z[0] != '-'
+        in_pos += z[1] != '-'
+        i += '-' not in z
+        if i == 0:
+            continue
+        # this is not a gap, nor the start of an indel
+        if '-' not in z and '-' not in al_pairs[j + 1]:
+            nmuts += 1
+            wt_save.append(z[0])
+            pos_save.append(org_pos)
+            in_save.append(in_pos)
+            mut_save.append(z[1])
+
+    # treat last position explicitely
+    if org_seq[end_pos] != in_seq[end_pos]:
+        nmuts += 1
+        wt_save.append(org_seq[end_pos])
+        pos_save.append(org_pos + 1)
+        in_save.append(in_pos + 1)
+        mut_save.append(in_seq[end_pos])
+
+    logging.info('%d mutated sites found on sample consensus', nmuts)
+    # parse insertions (i.e. gaps in org_seq)
+    match = re.finditer(r"\w-+", org_seq[:end_pos])
+    if match:
+        match_list = list(match)
+        logging.info('%d insertions found on sample consensus', len(match_list))
+        for m in match_list:
+            logging.debug('start:%d end:%d insertion: %s',
+                          m.start(), m.end(), m.group(0))
+            # pos of base before gap start, 1-based, computed on organism reference
+            ins_start = len(org_seq[:m.start() + 1].replace('-', ''))
+            # pos of base before gap starts, 1-based, computed on input sequence
+            ins_start_in = len(in_seq[:m.start() + 1].replace('-', ''))
+            wt = org_seq[m.start()]
+            assert wt == org_ref[ins_start - 1]
+            mut = in_seq[m.start():m.end()]
+            assert '-' not in mut
+            wt_save.append(wt)
+            pos_save.append(ins_start)
+            in_save.append(ins_start_in)
+            mut_save.append(mut)
+
+    # parse deletions (i.e. gaps in in_seq)
+    match = re.finditer(r"\w-+", in_seq[:end_pos])
+    if match:
+        match_list = list(match)
+        logging.info('%d deletions found on sample consensus', len(match_list))
+        for m in match_list:
+            logging.debug('start:%d end:%d deletion: %s',
+                          m.start(), m.end(), m.group(0))
+            # pos of base before gap_start, 1-based, computed on organism reference
+            del_start = len(org_seq[:m.start() + 1].replace('-', ''))
+            # pos of base before gap_start, 1-based, computed on input sequence
+            del_start_in = len(in_seq[:m.start() + 1].replace('-', ''))
+            wt = org_seq[m.start():m.end()]
+            assert wt[0] == org_ref[del_start - 1]
+            mut = m.group(0).rstrip('-')
+            wt_save.append(wt)
+            pos_save.append(del_start)
+            in_save.append(del_start_in)
+            mut_save.append(mut)
+
+    here_muts = pd.DataFrame({'pos': pos_save, 'wt': wt_save, 'mut': mut_save, 'in_pos': in_save})
+    here_muts['pos'] = here_muts['pos'].astype(int)
+    return here_muts
+
+
+def sequence_2_df(seq_in):
+    """Return a DataFrame with pos (1-based), base and frequency (1.0)."""
+    pos = [i + 1 for i in range(len(seq_in))]
+    df_out = pd.DataFrame({'pos': pos, 'mut': list(seq_in), 'freq': 1.0})
+    df_out['pos'] = df_out['pos'].astype(int)
+    df_out['freq'] = df_out['freq'].astype(float)
+    return df_out
+
+
+def df_2_sequence(df_in):
+    """Take a DataFrame with positions and nucleotides and returns a sequence.
+
+    If a frequency column exists, select the positions with maximum frequency.
+    """
+    if 'freq' in df_in.columns:
+        max_freq_idx = df_in.groupby(['pos'])['freq'].transform(max) == df_in['freq']
+        df_in = df_in[max_freq_idx]
+    df_in = df_in.sort_values(by='pos', ascending=True)
+    return ''.join(df_in.mut.tolist())
+
+
+def nt_freq_2_aa_freq(df_nt, frame):
+    """Compute aminoacid mutations from a DataFrame of nucleotide mutations.
+
+    Nucleotides passed are expected to be on the same codon.
+    Example:
+    pos  mut    freq           pos   codon  freq               pos   aa   freq
+    1    T      1.0             1     TTA    0.9                1     L    0.9
+    2    T      0.9     --->    1     TCA    0.1        --->    1     S    0.9
+    2    C      0.1
+    3    A      1.0
+    """
+    from itertools import product
+    df_nt = df_nt.sort_values(by=['pos', 'freq'], ascending=[True, False])
+    min_pos, max_pos = min(df_nt.pos), max(df_nt.pos)
+    assert max_pos - min_pos == 2, df_nt
+    codon_number = int(1 + (min_pos - frame) / 3)
+    assert (min_pos - frame) % 3 == 0
+    low_freq_positions = set(df_nt[df_nt.freq < 1.0].pos.tolist())
+    if low_freq_positions == set([]):
+        logging.debug('no mutated position in codon %d', codon_number)
+        try:
+            aa = translation_table[''.join(df_nt.mut.tolist())]
+            return [codon_number], [aa], [1.0]
+        except KeyError:
+            warnings.warn('frameshift mutations around pos:%d' % min_pos)
+            return [], [], []
+    elif len(low_freq_positions) == 1:
+        logging.debug('one mutated position in codon %d', codon_number)
+        freqs = df_nt[df_nt.freq < 1.0].freq.tolist()
+        # build all combinations of nucleotides
+        a = [df_nt[df_nt.pos == min_pos + i].mut.tolist() for i in range(3)]
+        combinations = [''.join(comb) for comb in product(a[0], a[1], a[2])]
+
+        aas = []
+        for i, x in enumerate(combinations):
+            if len(x) == 3:
+                aas.extend(translation_table[x])
+            else:
+                if len(x) % 3 != 0:
+                    warnings.warn('frameshift mutation at freq %f' % freqs[i])
+                    print(df_nt)
+                    aas.extend('*')
+                    continue
+                split = [translation_table[x[i: i + 3]] for i in range(0, len(x), 3)]
+                aas.extend([''.join(split)])
+
+
+        assert len(aas) == len(freqs), '%s - %s - %s' % (combinations, aas, freqs)
+        return [codon_number] * len(freqs), aas, freqs
+    else:
+        logging.info('phasing needed in codon %d', codon_number)
+        warnings.warn('you need to phase')
+        return [], [], []
+
+
+def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_file='hq_2_cns_final_recal.bam',
+         organism='HCV'):
     """What the main does."""
     # ref_file is the sample consensus
-    # parse mutations already found in the sample consensus wrt to
-    # organism reference (consensus B pol gene for HIV)
     ref_nt = list(SeqIO.parse(ref_file, 'fasta'))[0]
-    frame, nt_framed, aa_framed = find_frame(ref_nt.seq)
-    del nt_framed
+    frame, aa_framed = find_frame(ref_nt.seq)
     del aa_framed
-    logging.info(
-        'sample consensus reference file:%s\tframe:%d', ref_file, frame)
-    logging.info('parsing mutations on consensus')
-    cns_mutations = parse_cons_mutations(ref_nt, organism)
-    # cns_mutations also has positions without mutations, used later
-    # to merge those in vcf_mutations
-    # only write real mutations to file
-    cns_diff = cns_mutations.set_index('pos')
-    cns_diff = cns_diff[cns_diff.freq == 1.0]
-    cns_diff.to_csv('cns_mutations_nt.csv', index=True)
+    logging.info('sample consensus reference file:%s\tframe:%d', ref_file, frame)
+    logging.info('parsing bases on consensus reference, 1-based')
+    cns_variants_nt = sequence_2_df(ref_nt)
+    # cns_variants_nt.to_csv('cns_variants_nt.csv', index=False, float_format='%2.1f')
 
+    logging.info('parsing bases in vcf file')
     vcf_stem = os.path.splitext(vcf_file)[0]
-
-    # parse mutations in vcf file
     vcf_mutations = parsevar('%s.vcf' % vcf_stem, ref_nt)
-
-    if vcf_mutations.shape[0]:
-        # synonymous mutations can be merged
-        vcf_mutations = vcf_mutations.groupby(
-            ['pos', 'wt', 'mut']).sum().reset_index()
-    # vcf_mutations.set_index(['pos', 'wt'], inplace=True)
-    vcf_mutations.to_csv(
-        'vcf_mutations_nt.csv', index=False, float_format='%6.4f')
-
-    # now we have cns_mutations, retrieved from consensus sequence in
-    # a fasta file and vcf_mutations, retrieved from vcf file created
-    # with a variant calling method; while cns_mutations has mutations
-    # of cns_final.fasta w.r.t. consensus B, vcf_mutations has minority
-    # mutations w.r.t. cns_final.fasta. We need to subtract vcf
-    # frequencies from cns ones the result is mutations w.r.t.
-    # consensus B, position is on cns_final
-    merged = merge_mutations(cns_mutations, vcf_mutations)
-
-    # check frequencies again
-    ch = merged.groupby(['pos', 'wt', 'mut']).sum()
-    msk = ch.freq <= 1.0
-    if not msk.all():
-        warnings.warn('frequencies should be normalised')
-
+    # vcf_mutations.to_csv('vcf_mutations_nt.csv', index=False, float_format='%6.4f')
+    logging.info('apply mutations in vcf to sample reference')
+    merged = merge_mutations(cns_variants_nt, vcf_mutations)
     merged.to_csv('merged_mutations_nt.csv', index=False, float_format='%6.4f')
 
-    # another step to phase variants that occur together on reads, kind of
-    # making haplotypes, but only three nt long (one codon)
-    phased = phase_mutations(merged, frame, bam_file)
-    phased.to_csv('phased.csv', sep=',', float_format='%6.4f', index=False)
+    logging.info('save max frequency sequence to file')
+    # generally slightly different from consensus reference
+    max_freq_cns = Seq(df_2_sequence(merged))
+    SeqIO.write(SeqRecord(max_freq_cns, id='max_freq_cons', description=''), 'cns_max_freq.fasta', 'fasta')
+    frame2, aa_framed = find_frame(max_freq_cns)
+    assert frame == frame2
 
-    # mutations can now be annotated and saved
-    anno_muts = annotate_mutations(phased, ref_nt, organism)
-    anno_muts = anno_muts.groupby(['gene', 'pos', 'wt', 'mut']).sum()
-    anno_muts = anno_muts.reset_index()
-    anno_muts = anno_muts.sort_values(
-        by=['gene', 'pos', 'freq'], ascending=[True, True, False])
-    anno_muts.to_csv(
-        'annotated_mutations.csv', sep=',', float_format='%6.4f', index=False)
+    logging.info('translate max frequency sequence')
+    # cns_variants_aa = sequence_2_df(aa_framed)
+    # cns_variants_aa.to_csv('max_freq_variants_aa.csv', index=False, float_format='%2.1f')
+    logging.info('align max freq to H77/consensus_B and save mutation list')
+    max_freq_muts_aa = compute_org_mutations(aa_framed, org_found=organism)
+    max_freq_muts_aa.to_csv('max_freq_muts_aa.csv', index=False, float_format='%6.4f')
+
+    ref_len = len(ref_nt)
+    last_codon_pos = ref_len - (ref_len - frame) % 3
+    codon_positions = [(i, i + 1, i + 2) for i in range(frame, last_codon_pos, 3)]
+    a_pos_save = []
+    aas_save = []
+    freqs_save = []
+    for c in codon_positions:
+        codon_muts = merged[merged.pos.isin(c)]
+        a_pos, aas, freqs = nt_freq_2_aa_freq(codon_muts, frame)
+        a_pos_save.extend(a_pos)
+        aas_save.extend(aas)
+        freqs_save.extend(freqs)
+    all_muts_aa = pd.DataFrame({'freq': freqs_save, 'in_pos': a_pos_save, 'mut': aas_save})
+    all_muts_aa_full = pd.merge(max_freq_muts_aa, all_muts_aa, on='in_pos')
+    all_muts_aa_full.sort_values(by=['pos', 'freq'], ascending=[True, False])
+    all_muts_aa_full.to_csv('final.csv', float_format='%6.4f')
+    sys.exit()
+
+    # find the indices of mutation with maximum frequency per position
+    max_freq_idx = merged.groupby(['pos'])['freq'].transform(max) == merged['freq']
+    # and the lof frequency ones
+    low_freq_idx = merged.groupby(['pos'])['freq'].transform(max) != merged['freq']
+    # check that they are disjoint
+    assert (max_freq_idx ^ low_freq_idx).all()
+    max_freq_muts_nt = merged[max_freq_idx]
+    low_freq_nt_muts = merged[low_freq_idx]
+    for row in low_freq_nt_muts.itertuples():
+        #impacted_mut = max_freq_muts_nt[max_freq_muts_nt.pos == row.pos]
+        #assert impacted_mut.shape[0] == 1, 'Maximum frequency means no position is repeated'
+        tmp_df = max_freq_muts_nt.copy()
+        # apply the low freq mutation on the max frequency data frame
+        tmp_df.ix[tmp_df.pos == row.pos, 'mut'] = row.mut
+        tmp_df.ix[tmp_df.pos == row.pos, 'freq'] = row.freq
+        print(max_freq_muts_nt[max_freq_muts_nt.pos == row.pos])
+        print(tmp_df[tmp_df.pos == row.pos])
+        tmp_seq = Seq(df_2_sequence(tmp_df))
+        SeqIO.write(SeqRecord(tmp_seq, id='tmp_seq', description=''), 'tmp_seq.fasta', 'fasta')
+        sys.exit()
+
+
+
+    # sys.exit()
+    # # now we have cns_mutations, retrieved from consensus sequence in
+    # # a fasta file and vcf_mutations, retrieved from vcf file created
+    # # with a variant calling method; while cns_mutations has mutations
+    # # of cns_final.fasta w.r.t. consensus B, vcf_mutations has minority
+    # # mutations w.r.t. cns_final.fasta. We need to subtract vcf
+    # # frequencies from cns ones the result is mutations w.r.t.
+    # # consensus B, position is on cns_final
+    # merged = merge_mutations(cns_variants_nt, vcf_mutations)
+    # # check frequencies again
+    # ch = merged.groupby(['pos', 'wt', 'mut']).sum()
+    # msk = ch.freq <= 1.0
+    # if not msk.all():
+    #     warnings.warn('frequencies should be normalised')
+    #
+    # merged.to_csv('merged_mutations_nt.csv', index=False, float_format='%6.4f')
+    #
+    # # another step to phase variants that occur together on reads, kind of
+    # # making haplotypes, but only three nt long (one codon)
+    # phased = phase_mutations(merged, frame, bam_file)
+    # phased.to_csv('phased.csv', sep=',', float_format='%6.4f', index=False)
+    #
+    # # mutations can now be annotated and saved
+    # anno_muts = annotate_mutations(phased, ref_nt, organism)
+    # anno_muts = anno_muts.groupby(['gene', 'pos', 'wt', 'mut']).sum()
+    # anno_muts = anno_muts.reset_index()
+    # anno_muts = anno_muts.sort_values(
+    #     by=['gene', 'pos', 'freq'], ascending=[True, True, False])
+    # anno_muts.to_csv(
+    #     'annotated_mutations.csv', sep=',', float_format='%6.4f', index=False)
 
 if __name__ == '__main__':
     main('hq_2_cns_final_recal.vcf', 'cns_final.fasta',

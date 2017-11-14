@@ -71,7 +71,7 @@ seq_h77_ins = Seq('TTCTTTCACGACCCTAAAAAAAAAAGCCAGCCTTGTCCACCGGCCTCATCCACCTCCACCA
 # one short deletion, one mismatch
 seq_h77_del = Seq('TTCCACGATGCCAGCCTTGTCCACCGGCCTCATCCACCTCCACCAGAACATTGTGGACGTGCAG')
 
-
+@pytest.mark.skip(reason="rewritten")
 def test_parse_cons_mutations():
 
     # test_no_mutations
@@ -104,15 +104,20 @@ assert os.path.exists(test_vcf)
 
 def test_parsevar():
     out = parsevar(test_vcf, ref_1)
-    assert len(out) == 2, out
+    assert len(out) == 4, out
     out_0 = out.iloc[0]
     out_1 = out.iloc[1]
+
     assert out_0['wt'] == 'T', out
     assert out_0['pos'] == 4, out
     assert out_0['mut'] == 'A', out
     assert out_1['wt'] == 'G', out
     assert out_1['pos'] == 11, out
     assert out_1['mut'] == 'C', out
+    assert out.iloc[2]['wt'] == 'G', out
+    assert out.iloc[2]['mut'] == 'CAAA', out
+    assert out.iloc[3]['wt'] == 'TAGG', out
+    assert out.iloc[3]['mut'] == 'C', out
 
 
 def test_find_frame():
@@ -122,7 +127,7 @@ def test_find_frame():
     assert str(nt_framed)[-1] == 'T'
     assert aa_framed == 'IYQYMDDLYVGSDLEIGQHRTKIEELRQHLLRWGFTTPDKKHQKEPPFL'
 
-
+@pytest.mark.skip(reason='Rewriting this')
 def test_merge_mutations():
     import pandas as pd
     cm = parse_cons_mutations(ref_1, 'HIV')
