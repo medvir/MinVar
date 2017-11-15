@@ -40,7 +40,7 @@ for i in range(747, 810):
 for i in range(810, 1027):
     h77_map[i] = 'NS2', i - 809
 for i in range(1027, 1658):
-    h77_map[i] = 'NS3', i - 1028
+    h77_map[i] = 'NS3', i - 1026
 for i in range(1658, 1712):
     h77_map[i] = 'NS4a', i - 1657
 for i in range(1712, 1973):
