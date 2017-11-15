@@ -14,10 +14,13 @@ Why does this file exist, and why not put this in __main__?
 
   Also see (1) from http://click.pocoo.org/5/setuptools/#setuptools-integration
 """
-import sys
 import argparse
-from pkg_resources import get_distribution, DistributionNotFound, \
-    resource_filename
+import os
+import sys
+
+from pkg_resources import (DistributionNotFound, get_distribution,
+                           resource_filename)
+
 try:
     __version__ = get_distribution('minvar').version
 
@@ -66,19 +69,19 @@ def main(args=None):
                         format=log_format, datefmt='%Y/%m/%d %H:%M:%S')
     logging.info(' '.join(sys.argv))
 
-    # from minvar import prepare
-    # cns_file, prepared_bam, org_found = prepare.main(args.f)
-    #
-    # from minvar import callvar
-    # called_file, called_bam = callvar.main(ref_file=cns_file,
-    #                                        bamfile=prepared_bam,
-    #                                        caller='lofreq',
-    #                                        recalibrate=args.recal)
+    from minvar import prepare
+    cns_file, prepared_bam, org_found = prepare.main(args.f)
+
+    from minvar import callvar
+    called_file, called_bam = callvar.main(ref_file=cns_file,
+                                           bamfile=prepared_bam,
+                                           caller='lofreq',
+                                           recalibrate=args.recal)
 
     from minvar import annotate
     annotate.main()
-#    annotate.main(vcf_file=called_file, ref_file=cns_file, bam_file=called_bam,
-#                  organism=org_found)
+    annotate.main(vcf_file=called_file, ref_file=cns_file, bam_file=called_bam,
+                  organism=org_found)
     sys.exit()
     from minvar import reportdrm
     reportdrm.main(org_found)

@@ -5,8 +5,7 @@ import os
 import pytest
 from Bio.Seq import Seq
 
-from src.minvar.annotate import (find_frame, merge_mutations, parsevar)
-
+from src.minvar.annotate import find_frame, merge_mutations, parsevar
 
 subtype1a = '''GCCAGCCCCCTGATGGGGGCGACACTCCACCATGAATCACTCCCCTGTGAGGAACTACTG\
 TCTTCACGCAGAAAGCGTCTAGCCATGGCGTTAGTATGAGTGTCGTGCAGCCTCCAGGAC\
@@ -109,7 +108,7 @@ def test_merge_mutations():
                        ['G', 1011, 'T', 0.2],   # already mutated in sample cons
                        ['T', 1050, 'A', 0.1]],  # mutates back to cons B
                       columns=['wt', 'pos', 'mut', 'freq'])
-    m_out = merge_mutations(vm)
+    m_out = merge_mutations(vm, vm)
     # two mutations in consensus, three in vcf but the one in pos 101 is
     # reverting to consensus B
     assert len(m_out) == 4

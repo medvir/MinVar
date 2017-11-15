@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Calls lofreq to produce a vcf file"""
 
+import logging
 import os
 import shlex
 import subprocess
-import logging
 
 dn_dir = os.path.dirname(os.path.abspath(__file__))
 
