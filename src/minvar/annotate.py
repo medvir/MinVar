@@ -101,102 +101,6 @@ def find_frame(ref):
     return best_frame, aa_seq[best_frame].strip('*')
 
 
-def parse_cons_mutations(input_seq, org_found):
-    """Return mutations of consensus w.r.t. reference.
-
-    It uses consensus_B for HIV, subtypre_ref.fasta for HCV. 1-based
-    coordinate on input sequence because we need to phase minority calls
-    later.
-    """
-    import re
-
-    logging.info('parsing consensus mutations for organism %s', org_found)
-    if org_found == 'HIV':
-        org_ref = str(B_pol_nt_seq)
-    elif org_found == 'HCV':
-        org_ref = str(h77_nt_seq)
-    # adapt penalties for testing with short sequences
-    go = 40.0 if len(input_seq) > 100 else 10.0
-    ge = 5.0 if len(input_seq) > 100 else 0.5
-    needle_align('asis:%s' % org_ref,
-                 'asis:%s' % str(input_seq), 'parse.tmp',
-                 go=go, ge=ge)
-    alhr = alignfile2dict(['parse.tmp'])
-    alih = alhr['asis']['asis']
-    alih.summary()
-    if 3 * alih.mismatches > alih.ident:
-        warnings.warn('Too many mismatches in parsing mutations')
-    else:
-        os.remove('parse.tmp')
-
-    # the naming of variables here below (B_seq, end_B, ...) stems from the
-    # fact that, originally, only HIV consensus_B was used
-    org_seq, in_seq = alih.seq_a.upper(), alih.seq_b.upper()
-
-    end_org, end_in = len(org_seq.rstrip('-')), len(in_seq.rstrip('-'))
-    end_pos = min(end_org, end_in)
-
-    here_muts = pd.DataFrame(columns=['wt', 'pos', 'mut'])
-    # these will count positions on wt, mutated sequence and matching positions
-    org_pos = 0
-    in_pos = 0
-    i = 0
-    nmuts = 0
-    freq_here = 1.0
-    # first pass does not parse indels
-    for z in list(zip(org_seq, in_seq))[:end_pos]:
-        org_pos += z[0] != '-'
-        in_pos += z[1] != '-'
-        i += '-' not in z
-        if i == 0:
-            continue
-        if z[0] != z[1] and '-' not in z:
-            nmuts += 1
-            dict_here = {'wt': z[0], 'pos': org_pos, 'mut': z[1],
-                         'freq': freq_here}
-            here_muts = here_muts.append(dict_here, ignore_index=True)
-
-    # parse insertions (i.e. gaps in org_seq)
-    match = re.finditer(r"\w-+", org_seq[:end_pos])
-    if match:
-        match_list = list(match)
-        logging.info('%d insertions found on sample consensus', len(match_list))
-        for m in match_list:
-            logging.debug('start:%d end:%d insertion: %s',
-                          m.start(), m.end(), m.group(0))
-            # pos of base before gap start, 1-based, computed on reference
-            ins_start = len(org_seq[:m.start() + 1].replace('-', ''))
-            wt = org_seq[m.start()]
-            assert wt == org_ref[ins_start - 1]
-            mut = in_seq[m.start():m.end()]
-            assert '-' not in mut
-            dict_here = {'wt': wt, 'pos': ins_start, 'mut': mut,
-                         'freq': freq_here}
-            here_muts = here_muts.append(dict_here, ignore_index=True)
-
-    # parse deletions (i.e. gaps in in_seq)
-    match = re.finditer(r"\w-+", in_seq[:end_pos])
-    if match:
-        match_list = list(match)
-        logging.info('%d deletions found on sample consensus', len(match_list))
-        for m in match_list:
-            logging.debug('start:%d end:%d deletion: %s',
-                          m.start(), m.end(), m.group(0))
-            # pos of base before gap_start, 1-based
-            del_start = len(org_seq[:m.start() + 1].replace('-', ''))
-            wt = org_seq[m.start():m.end()]
-            assert wt[0] == org_ref[del_start - 1]
-            mut = m.group(0).rstrip('-')
-            dict_here = {'wt': wt, 'pos': del_start, 'mut': mut,
-                         'freq': freq_here}
-            here_muts = here_muts.append(dict_here, ignore_index=True)
-
-    logging.info('%d mutated sites found on sample consensus', nmuts)
-    here_muts['pos'] = here_muts['pos'].astype(int)
-
-    return here_muts
-
-
 def parsevar(vcf_file, ref_seq):
     """Parse mutations in vcf file.
 
@@ -219,7 +123,7 @@ def parsevar(vcf_file, ref_seq):
 
     # ref_seq = list(SeqIO.parse(ref_file, 'fasta'))[0]
     # frame, nt_framed, aa_framed = find_frame(ref_seq)
-    ref_nt = str(ref_seq.seq)
+    ref_nt = str(ref_seq)
     vcf_mutations = pd.DataFrame(columns=['wt', 'pos', 'mut', 'freq'])
     # vcf_mutations = vcf_mutations.set_index(['gene', 'pos', 'mut'])
     # now parses the variants
@@ -292,95 +196,16 @@ def merge_mutations(cns_muts, vcf_muts):
         save_pos.append(pos)
         save_freq.append(1. - cumulative)
         save_mut.append(cns_muts[cns_muts.pos == pos].mut.tolist()[0])
-
-        # now iterate on mutations
+        # now add all mutations
         save_pos.extend(variants_here.pos.tolist())
         save_freq.extend(variants_here.freq.tolist())
         save_mut.extend(variants_here.mut.tolist())
-        # for row in variants_here.itertuples():
-        #     save_pos.append(getattr(row, 'pos'))
-        #     save_freq.append(getattr(row, 'freq'))
-        #     save_mut.append(getattr(row, 'mut'))
+
     mutated = pd.DataFrame({'pos': save_pos, 'freq': save_freq, 'mut': save_mut})
     merged = pd.concat([unmutated, mutated])
     merged = merged[merged.freq > 0]
     merged = merged.sort_values(by=['pos', 'freq'], ascending=[True, False])
     return merged
-
-
-def old_merge_mutations(cons_muts, vcf_muts):
-    """Merge mutations on samples consensus with those in vcf file.
-
-    Mutations found on sample consensus w.r.t. organism consensus and
-    minority ones found w.r.t. sample consensus must be merged to represent
-    true state of variants w.r.t. consensus B. For all, position is on sample
-    consensus
-
-    e.g. let's consider
-    positions    1 2 3 4 5 6 7
-    org. cons    A C T G A T T
-                 | |   | | |
-    sample cons  A C C G T T A
-                 :   :   :
-    vcf muts     C   G   A
-
-    and let's assume that both vcf variants have frequency 20%.
-
-    In position 1 we have sample consensus conserved and a variant in vcf.
-    We only need to report
-    A, 1, C, 0.2
-
-    In position 3 we have both in sample consensus and vcf a variation.
-    We need to report both
-    T, 3, C, 0.8 (i.e. 100% - 20%)
-    and
-    T, 3, G, 0.2
-
-    In position 5 the mutation in vcf is the consensus_B wild type, so we only
-    need to correct the frequency of cns and report
-    A, 5, T, 0.8
-
-    In position 7 we only have a mutation on sample consensus, so we only
-    report
-    T, 7, A, 1.0
-    """
-    case = {}
-    # pos can be index on cns_mutations because they are unique
-    cons_muts.set_index(['pos'], inplace=True, verify_integrity=True)
-    cc = pd.DataFrame(columns=['wt', 'pos', 'mut', 'freq'])
-
-    for k, v in vcf_muts.iterrows():
-        pos = v.pos
-        cns_here = cons_muts.loc[pos]
-
-        # sample consensus is used as a reference in variant calling
-        if cns_here.mut != '-' and v.wt != '-':
-            assert cns_here.mut == v.wt, '%d %s %s' % (pos, cns_here, v)
-        # change the reference of vcf mutations to what is found in consensus B
-        v.wt = cns_here.wt
-
-        # like pos 1 in docstring example
-        if cons_muts.loc[pos, 'freq'] == 0.0:
-            cc = cc.append(v)
-            case[1] = case.get(1, 0) + 1
-        # like pos 3 in docstring example
-        elif cons_muts.loc[pos, 'freq'] > 0.0 and v.mut != cns_here.wt:
-            # correct frequency of mutation in sample consensus
-            cons_muts.loc[pos, 'freq'] -= v['freq']
-            cc = cc.append(v)
-            case[3] = case.get(3, 0) + 1
-        # like pos 5 in docstring example
-        elif cons_muts.loc[pos, 'freq'] > 0.0 and v.mut == cns_here.wt:
-            cons_muts.loc[pos, 'freq'] -= v['freq']
-            case[5] = case.get(5, 0) + 1
-    logging.info('reporting mutations merging results')
-    logging.info('case: %s', str(case))
-    cons_muts = cons_muts.reset_index()
-    cc = pd.concat([cons_muts, cc], ignore_index=True)
-    cc = cc[cc.freq > 0.0]
-    cc.pos = cc.pos.astype(int)
-    cc = cc.sort_values(by=['pos', 'freq'], ascending=[True, False])
-    return cc
 
 
 def phase_mutations(muts, frame, bam_file):
@@ -489,255 +314,6 @@ def phase_mutations(muts, frame, bam_file):
     return phased_muts
 
 
-def extract_hcv_orf(gen_ref_seq):
-    """Extract the HCV ORF from the given sequence.
-
-    HCV genome starts with a 341 nt 5'UTR region that is quite well
-    conserved. After this region starts the long ORF where all
-    proteins are encoded. This function cuts the input sequence from
-    the beginning of the ORF to the end of the genome by aligning to
-    the 5'UTR sequence.
-    """
-    needle_align(
-        'asis:%s' % str(utr_5p_seq), 'asis:%s' % str(gen_ref_seq),
-        'z.tmp', go=40.0, ge=5.0)
-    alhr = alignfile2dict(['z.tmp'])
-    os.remove('z.tmp')
-    alih = alhr['asis']['asis']
-    alih.summary()
-    utr, ref = alih.seq_a.upper(), alih.seq_b.upper()
-    end_utr = len(utr.rstrip('-'))
-    cut_ref = ref[end_utr:]
-    return Seq(cut_ref), end_utr
-
-
-def get_align_map(ref_nt, B_nt):
-
-    frame, framed_aa = find_frame(ref_nt)
-    del frame
-
-    # build map of sample consensus to DRM/RAS reference
-    needle_align('asis:%s' % str(B_nt.translate()),
-                 'asis:%s' % str(framed_aa), 'h.tmp',
-                 go=40.0, ge=5.0)
-    alhr = alignfile2dict(['h.tmp'])
-    alih = alhr['asis']['asis']
-    alih.summary()
-    if 3 * alih.mismatches > alih.ident:
-        warnings.warn('Too many mismatches in ref vs consensus B')
-    else:
-        os.remove('h.tmp')
-    ref, cur = alih.seq_a.upper(), alih.seq_b.upper()
-    end_ref, end_cur = len(ref.rstrip('-')), len(cur.rstrip('-'))
-    end_pos = min(end_ref, end_cur)
-    # this saves map[pos on sample reference] = pos on DRM/RAS nucleotide ref
-    ref_pos = 0
-    extend_ref = []
-    for z in ref[:end_pos]:
-        if z != '-':
-            coords = [str(p) for p in range(ref_pos, ref_pos + 3)]
-            ref_pos += 3
-        else:
-            coords = ['-', '-', '-']
-        extend_ref.extend(coords)
-    ref_pos = 0
-    extend_cur = []
-    for z in cur[:end_pos]:
-        if z != '-':
-            coords = [str(p) for p in range(ref_pos, ref_pos + 3)]
-            ref_pos += 3
-        else:
-            coords = ['-', '-', '-']
-        extend_cur.extend(coords)
-    align_map = {}
-    ref_pos = 0
-    cur_pos = 0
-    for z in zip(extend_cur, extend_ref):
-        cur_pos += z[0] != '-'
-        ref_pos += z[1] != '-'
-        if ref_pos == 0:
-            align_map[cur_pos] = '0-utr'
-            continue
-        if z[0] == '-':
-            # deletion
-            align_map[cur_pos] = '%d-del' % ref_pos
-        elif z[1] == '-':
-            # insertion
-            align_map[cur_pos] = '%d-ins' % ref_pos
-        else:
-            align_map[cur_pos] = '%d' % ref_pos
-
-    return align_map
-
-
-def place_mutation(mutation, nt_ref, alignment_map):
-    """Mutation nt_ref with mutation, knowing the alignment map.
-
-    A few examples, assuming that mutation.pos is 4:
-
-    ## Insertion
-
-    1 2 3       4 5 6 7 8 9
-    A C G - - - C G A C T T  nt_ref
-    A C C A C C C G G C T G  sample consensus
-    1 2 3 4 5 6 7 8 9 0 1 2
-
-    This should result in:
-    A C G A C C C G A C T T
-
-    ## Deletion
-
-    1 2 3 4 5 6 7 8 9 0 1 2
-    A C G C G A C T T C T G  nt_ref
-    A C C - - - C G G C T G  sample consensus
-    1 2 3       4 5 6 7 8 9
-
-    This should result in:
-    A C G - - - C T T C T G
-
-    ## Mismatch
-
-    1 2 3 4 5 6 7 8 9
-    A C G C G A C T G  nt_ref
-    A C C C G G C T A  sample consensus
-    1 2 3 4 5 6 7 8 9
-
-    This should result in:
-    A C G - - - C T T C T G
-
-
-
-     """
-
-    alt_nt = mutation.mut
-    ref_pos = alignment_map[mutation.pos]
-
-
-def annotate_mutations(mutations, ref, org_found):
-    """Write gene, position, wild type, mutation, frequency in a data frame.
-
-    Takes a DataFrame with nucleotide mutations and translates and
-    annotates them according to coordinates in consensus B genes.
-    Position on mutations is on ref (sample consensus), so we need to
-    report these onto consensus B or HCV reference.
-
-    EDIT:
-    This function works on both HIV and HCV, but the naming of the
-    variables reflect the fact that it was written for HIV only at the
-    beginning.
-    """
-    anno_variants = pd.DataFrame(columns=['gene', 'pos', 'wt', 'mut', 'freq'])
-    if mutations.empty:
-        return anno_variants
-    ref_nt = ref.seq
-
-    # save the DRM/RAS reference
-    if org_found == 'HIV':
-        B_nt = B_pol_nt_seq
-        B_aa = B_pol_aa_seq
-        # orf_pos = 0
-    elif org_found == 'HCV':
-        # sub_ref_nt_seq = list(SeqIO.parse('subtype_ref.fasta','fasta'))[0].seq
-        B_nt = h77_nt_seq
-        B_aa = h77_aa_seq
-        # orf_seq, orf_pos = extract_hcv_orf(sub_ref_nt_seq)
-        # del orf_seq
-        # del frame
-    align_map = get_align_map(ref_nt, B_nt)
-
-    # annotate each mutation
-    for k, v in mutations.iterrows():
-        del k
-        # position on nt DRM/RAS reference
-        mapped = align_map[v.pos]
-        if mapped == '0-utr':
-            continue
-        try:
-            ref_pos = int(mapped)
-            pattern = 'match'
-        except ValueError:
-            ref_pos, pattern = int(mapped.split('-')[0]), mapped.split('-')[1]
-        alt_nt = v.mut
-        # mutate the DRM/RAS reference in this specific position
-        if len(v.wt) == 1 and len(v.mut) == 1:  # v.wt can be XYZ after phasing
-            print(ref_pos, pattern, mapped)
-            print(B_nt[ref_pos - 2:ref_pos + 2])
-            #assert B_nt[ref_pos - 1] == v.wt, \
-            #    '%s is not %s' % (B_nt[ref_pos - 1], v)
-        mut_nt = B_nt[:ref_pos - 1] + alt_nt + B_nt[ref_pos - 1 + len(alt_nt):]
-        mut_nt = place_mutation(v, B_nt, align_map)
-        # mut_nt is the whole sequence with just one mutated codon
-        # B_nt is already in frame -> mut_nt must be in frame too
-        # translate it all
-        try:
-            mut_aa = mut_nt.translate()
-        except Bio.Data.CodonTable.TranslationError:
-            if '---' in mut_nt:
-                mut_aa = ''.join(
-                    [translation_table[str(mut_nt[i:i + 3])]
-                     for i in range(0, len(mut_nt), 3)])
-            else:
-                warnings.warn(
-                    'CodonTable transl. err.: mut_nt:%s wt:%s pos:%d alt:%s' %
-                    (mut_nt, v.wt, v.pos, alt_nt))
-                continue
-        if mut_aa == B_aa:
-            # silent mutation
-            continue
-        assert len(mut_aa) == len(B_aa), \
-            '%d is not %d' % (len(mut_aa), len(B_aa))
-        # 0-based position of the mutated codon on prot DRM/RAS reference
-        aa_pos = int((ref_pos - 1) / 3)
-        assert aa_pos <= len(mut_aa), '%d %d %s' % (aa_pos, len(mut_aa), mut_aa)
-
-        a_mut = []
-        for i, a in enumerate(zip(B_aa, mut_aa)):
-            if a[0] != a[1]:
-                a_mut.append((i, a))
-        assert len(a_mut) == 1, a_mut
-        if aa_pos != a_mut[0][0]:
-            warnings.warn('Is it %d or %d?' % (a_mut[0][0], aa_pos))
-        B_codon, mut_codon = a_mut[0][1]
-        if B_codon == mut_codon:
-            warnings.warn('There must be a mutation here')
-        B_pos = aa_pos + 1  # 1-based postion on prot DRM/RAS reference
-        if org_found == 'HIV':
-            gene_name, gene_pos = consensus_B_map[B_pos]
-        elif org_found == 'HCV':
-            gene_name, gene_pos = h77_map[B_pos]
-        if gene_pos <= 0:
-            continue
-        # mut_tp = '%s%d%s' % (z[0], i, z[1])
-        dict_here = {'gene': gene_name, 'wt': B_codon,
-                     'pos': gene_pos, 'mut': mut_codon, 'freq': v.freq}
-        anno_variants = anno_variants.append(dict_here, ignore_index=True)
-
-    anno_variants['pos'] = anno_variants['pos'].astype(int)
-
-    return anno_variants
-
-
-def gene_map(pos, org_found):
-    """Return the gene name and the position on the gene of a codon found."""
-    if pos <= 56:
-        gene_name = 'GagPolTF'
-        gene_pos = pos
-    elif 57 <= pos and pos <= 155:
-        gene_name = 'protease'
-        gene_pos = pos - 56
-    elif 156 <= pos and pos <= 595:
-        gene_name = 'RT'
-        gene_pos = pos - 155
-    elif 596 <= pos and pos <= 715:
-        gene_name = 'RNase'
-        gene_pos = pos - 595
-    elif 716 <= pos and pos <= 1003:
-        gene_name = 'integrase'
-        gene_pos = pos - 715
-
-    return gene_name, gene_pos
-
-
 def compute_org_mutations(aa_sequence, org_found):
     """Compute mutation profile and mapping of a protein sequence.
 
@@ -762,8 +338,8 @@ def compute_org_mutations(aa_sequence, org_found):
     alih.summary()
     if 3 * alih.mismatches > alih.ident:
         warnings.warn('Too many mismatches in parsing mutations')
-#    else:
-#        os.remove('parse.tmp')
+    else:
+        os.remove('parse.tmp')
 
     # the naming of variables here below (B_seq, end_B, ...) stems from the
     # fact that, originally, only HIV consensus_B was used
@@ -952,7 +528,7 @@ def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_fi
 
     logging.info('parsing bases in vcf file')
     vcf_stem = os.path.splitext(vcf_file)[0]
-    vcf_mutations = parsevar('%s.vcf' % vcf_stem, ref_nt)
+    vcf_mutations = parsevar('%s.vcf' % vcf_stem, ref_nt.seq)
     # vcf_mutations.to_csv('vcf_mutations_nt.csv', index=False, float_format='%6.4f')
     logging.info('apply mutations in vcf to sample reference')
     merged = merge_mutations(cns_variants_nt, vcf_mutations)
@@ -1007,56 +583,6 @@ def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_fi
     real_muts = real_muts.drop(['organism', 'pos'], axis=1)
     real_muts = real_muts[['gene', 'wt', 'gene_pos', 'mut', 'freq']]
     real_muts.to_csv('final.csv', index=False, float_format='%6.4f')
-
-    # # find the indices of mutation with maximum frequency per position
-    # max_freq_idx = merged.groupby(['pos'])['freq'].transform(max) == merged['freq']
-    # # and the lof frequency ones
-    # low_freq_idx = merged.groupby(['pos'])['freq'].transform(max) != merged['freq']
-    # # check that they are disjoint
-    # assert (max_freq_idx ^ low_freq_idx).all()
-    # max_freq_muts_nt = merged[max_freq_idx]
-    # low_freq_nt_muts = merged[low_freq_idx]
-    # for row in low_freq_nt_muts.itertuples():
-    #     #impacted_mut = max_freq_muts_nt[max_freq_muts_nt.pos == row.pos]
-    #     #assert impacted_mut.shape[0] == 1, 'Maximum frequency means no position is repeated'
-    #     tmp_df = max_freq_muts_nt.copy()
-    #     # apply the low freq mutation on the max frequency data frame
-    #     tmp_df.ix[tmp_df.pos == row.pos, 'mut'] = row.mut
-    #     tmp_df.ix[tmp_df.pos == row.pos, 'freq'] = row.freq
-    #     print(max_freq_muts_nt[max_freq_muts_nt.pos == row.pos])
-    #     print(tmp_df[tmp_df.pos == row.pos])
-    #     tmp_seq = Seq(df_2_sequence(tmp_df))
-    #     SeqIO.write(SeqRecord(tmp_seq, id='tmp_seq', description=''), 'tmp_seq.fasta', 'fasta')
-
-    # # now we have cns_mutations, retrieved from consensus sequence in
-    # # a fasta file and vcf_mutations, retrieved from vcf file created
-    # # with a variant calling method; while cns_mutations has mutations
-    # # of cns_final.fasta w.r.t. consensus B, vcf_mutations has minority
-    # # mutations w.r.t. cns_final.fasta. We need to subtract vcf
-    # # frequencies from cns ones the result is mutations w.r.t.
-    # # consensus B, position is on cns_final
-    # merged = merge_mutations(cns_variants_nt, vcf_mutations)
-    # # check frequencies again
-    # ch = merged.groupby(['pos', 'wt', 'mut']).sum()
-    # msk = ch.freq <= 1.0
-    # if not msk.all():
-    #     warnings.warn('frequencies should be normalised')
-    #
-    # merged.to_csv('merged_mutations_nt.csv', index=False, float_format='%6.4f')
-    #
-    # # another step to phase variants that occur together on reads, kind of
-    # # making haplotypes, but only three nt long (one codon)
-    # phased = phase_mutations(merged, frame, bam_file)
-    # phased.to_csv('phased.csv', sep=',', float_format='%6.4f', index=False)
-    #
-    # # mutations can now be annotated and saved
-    # anno_muts = annotate_mutations(phased, ref_nt, organism)
-    # anno_muts = anno_muts.groupby(['gene', 'pos', 'wt', 'mut']).sum()
-    # anno_muts = anno_muts.reset_index()
-    # anno_muts = anno_muts.sort_values(
-    #     by=['gene', 'pos', 'freq'], ascending=[True, True, False])
-    # anno_muts.to_csv(
-    #     'annotated_mutations.csv', sep=',', float_format='%6.4f', index=False)
 
 if __name__ == '__main__':
     main('hq_2_cns_final_recal.vcf', 'cns_final.fasta',
