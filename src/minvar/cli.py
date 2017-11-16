@@ -79,7 +79,6 @@ def main(args=None):
                                            recalibrate=args.recal)
 
     from minvar import annotate
-    annotate.main()
     annotate.main(vcf_file=called_file, ref_file=cns_file, bam_file=called_bam,
                   organism=org_found)
     sys.exit()
