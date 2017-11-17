@@ -92,12 +92,7 @@ def find_frame(ref):
         if len1 > max_len:
             best_frame = f
             max_len = len1
-    to_trim = (len(refseq) - best_frame + 1) % 3
-
-    if to_trim:
-        return best_frame, Seq(refseq[best_frame - 1:-to_trim]),\
-            aa_seq[best_frame].strip('*')
-
+#    to_trim = (len(refseq) - best_frame + 1) % 3
     return best_frame, aa_seq[best_frame].strip('*')
 
 
@@ -526,13 +521,13 @@ def nt_freq_2_aa_freq(df_nt, frame, bam_file=None):
 
         aas = []
         for i, x in enumerate(combinations):
+            if '-' in x or len(x) % 3:
+                logging.warning('frameshift mutation at freq %f', freqs[i])
+                aas.extend('*')
+                continue
             if len(x) == 3:
                 aas.extend(translation_table[x])
             else:
-                if len(x) % 3 != 0:
-                    logging.warning('frameshift mutation at freq %f', freqs[i])
-                    aas.extend('*')
-                    continue
                 split = [translation_table[x[i: i + 3]] for i in range(0, len(x), 3)]
                 aas.extend([''.join(split)])
 
