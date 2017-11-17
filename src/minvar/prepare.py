@@ -24,7 +24,7 @@ HCV_recomb_references = \
     resource_filename(__name__, 'db/HCV/recomb_references.fasta')
 HIV_recomb_references = \
     resource_filename(__name__, 'db/HIV/recomb_references.fasta')
-blast2sam_exe = resource_filename(__name__, '../scripts/blast2sam.py')
+blast2sam_exe = 'blast2sam'  # resource_filename(__name__, '../scripts/blast2sam.py')
 HIV_amp = resource_filename(__name__, 'db/HIV/consensus_B.fna')
 # HCV_amp =
 
