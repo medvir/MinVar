@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-''' Provides some methods to work with needle (EMBOSS) alignments'''
+"""Provide some methods to work with needle (EMBOSS) alignments."""
 __author__ = "Osvaldo Zagordi"
 __version__ = "$Revision: 0.1 $"
 __copyright__ = ""
@@ -31,41 +31,30 @@ dna_code = {
 GO = 6.0
 GE = 3.0
 
+
 class AlignDict(dict):
-    '''
-    A set of alignment instances. Subclass dict
-    in order to have a 2D dictionary.
-    '''
+    """A set of alignment instances. Subclass dict in order to have a 2D dictionary."""
 
     def __init__(self, set_name, gap_open, gap_extend):
-        '''
-        Initialization needs a name, gap open, gap extension
-        '''
+        """Initialization needs a name, gap open, gap extension."""
         self.name = set_name
         self.gap_open = gap_open
         self.gap_extend = gap_extend
         self.default = {}
 
     def __getitem__(self, key):
-        '''
-            subclassing dictionary getitem
-            '''
+        """subclassing dictionary getitem."""
         if key not in self:
             self[key] = {}
         return dict.__getitem__(self, key)
 
 
 class AlignInstance:
+    """Represents a single pairwise alignment."""
 
-    '''
-    Represents a single pairwise alignment
-    '''
     def __init__(self, id_a, id_b, seq_a, seq_b, score,
                  descr_a=None, descr_b=None):
-        '''
-        Initialization needs id of both sequences, zipped sequence
-        pair, and score
-        '''
+        """Initialization needs id of both sequences, zipped sequence pair, and score."""
         self.id_a = id_a
         self.id_b = id_b
 
@@ -76,11 +65,7 @@ class AlignInstance:
         self.descr_b = descr_b
 
     def summary(self):
-        '''
-        summary must be called to calculate start, stop,
-        internal gaps, and identity
-        '''
-
+        """Summary must be called to calculate start, stop, internal gaps, and identity."""
         import warnings
 
         start = None
@@ -134,8 +119,7 @@ class AlignInstance:
             if p is None:
                 break
             if p == ('-', '-'):
-                print(' double gap in %s %s' % \
-                    (self.id_a, self.id_b), file=sys.stderr)
+                print(' double gap in %s %s' % (self.id_a, self.id_b), file=sys.stderr)
             if p[0] == '-':
                 self.insertions += 1
             elif p[1] == '-':
@@ -143,8 +127,7 @@ class AlignInstance:
             if p[0].upper() == p[1].upper():
                 self.ident += 1
             # count mismatches with appropriate method for dna and aa
-            if seq_type == 'dna' and \
-               (dna_code[p[0].upper()] & dna_code[p[1].upper()] == set([])):
+            if seq_type == 'dna' and (dna_code[p[0].upper()] & dna_code[p[1].upper()] == set([])):
                 self.mismatches += 1
             elif seq_type == 'aa' and (p[0].upper() != p[1].upper()):
                 self.mismatches += 1
@@ -152,10 +135,7 @@ class AlignInstance:
         return
 
     def print_info(self):
-        '''
-            Print all information to stderr
-            '''
-
+        """Print all information to stderr."""
         print('id_a:', self.id_a, file=sys.stderr)
         print('id_b:', self.id_b, file=sys.stderr)
         print('start:', self.start, file=sys.stderr)
@@ -166,7 +146,7 @@ class AlignInstance:
 
 
 def alstart(seq_a, seq_b):
-    '''Returns starting position of an alignment, given two sequences'''
+    """Return starting position of an alignment, given two sequences."""
     import tempfile
 
     f = tempfile.NamedTemporaryFile()  # delete=False)
@@ -183,21 +163,17 @@ def alstart(seq_a, seq_b):
 
 
 def alignfile2dict(al_files, name='noname', gap_open=GO, gap_extend=GE):
-    """
-        Takes a list of files and returns an alignment 2D dictionary
-        """
+    """Take. a list of files and returns an alignment 2D dictionary."""
     from Bio import AlignIO
 
     al_set = AlignDict(name, gap_open, gap_extend)
     for f_file in al_files:
         alignment = AlignIO.read(f_file, 'fasta')
         assert len(alignment) == 2
-        id_a, id_b = alignment[0].id.split('#')[0], \
-            alignment[1].id.split('#')[0]
+        id_a, id_b = alignment[0].id.split('#')[0], alignment[1].id.split('#')[0]
         descr_a = alignment[0].description
         descr_b = alignment[1].description
-        a, b = str(alignment[0].seq).upper(), \
-               str(alignment[1].seq).upper()
+        a, b = str(alignment[0].seq).upper(), str(alignment[1].seq).upper()
 
         al_set[id_a][id_b] = AlignInstance(id_a, id_b, a, b, descr_a, descr_b)
 
@@ -206,9 +182,7 @@ def alignfile2dict(al_files, name='noname', gap_open=GO, gap_extend=GE):
 
 def needle_align(a_seq, b_seq, out_file, go=GO, ge=GE,
                  reverse1=False, reverse2=False):
-    """ Does not require cmline, neither from Biopython,
-        nor from pythonlib
-    """
+    """Run needle via subprocess."""
     import shlex
     import subprocess
     Verbose = False
@@ -241,9 +215,7 @@ def needle_align(a_seq, b_seq, out_file, go=GO, ge=GE,
 
 
 def main():
-    '''
-    Quick test
-    '''
+    """Quick test."""
     print(' running a quick test '.center(60, '#'))
     print(' some information is printed '.center(60, '#'))
     a = 'AAAAACACACGCAT-------'
@@ -254,6 +226,7 @@ def main():
     ai.summary()
     ai.print_info()
     print(ai.ident)
+
 
 if __name__ == '__main__':
     main()

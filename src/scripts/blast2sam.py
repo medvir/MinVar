@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
+r"""Parse Blast output in XML with Biopython and converts to SAM (v1).
 
-''' Parse Blast output in XML with Biopython and converts to SAM (v1).
 Tested with Biopython 1.64 and BLASTN 2.2.30+ command
 
     blastn -task blastn -subject ref.fasta -query reads.fasta -outfmt 5 \
@@ -114,11 +114,9 @@ SAM alignment mandatory fields
 9 TLEN Int [-2^31 + 1, 2^31 - 1] observed Template LENgth
 10 SEQ String \*|[A-Za-z=.]+ segment SEQuence
 11 QUAL String [!-~]+ ASCII of Phred-scaled base QUALity + 33
-'''
-
+"""
 import sys
 import copy
-#from pprint import pprint
 from itertools import tee
 from math import log10
 from Bio.Seq import Seq
@@ -131,7 +129,7 @@ sam_line = ['', 0, None, 0, 0, None, '*', 0, 0, '*', '*']
 
 
 def cigar(subject, query, queryStart, queryEnd, querySize):
-    '''Build CIGAR representation from an HSP
+    """Build CIGAR representation from an HSP.
 
     GTCCATGCAATTTTAAGACTTGAACCCCCTTGACTGATTACAGTCAGT   original sequence: 48 bp
 
@@ -139,8 +137,7 @@ def cigar(subject, query, queryStart, queryEnd, querySize):
     GTCCATGCAATTTTAAGACTTG--------------AACCCCCTTGACTGATTACAGTCAGT  query
     ||||||||||||||||||||||              ||||||||||||||||||||||||||  midline
     GTCCATGCAATTTTAAGACTTGAACCTGTGATCTGAAACCCCCTTGACTGATTACAGTCAGT  subject
-    '''
-
+    """
     # To store CIGAR representation
     cigar_str = []
     # Head clipping
@@ -187,7 +184,7 @@ def cigar(subject, query, queryStart, queryEnd, querySize):
 
     # Tail clipping
     if queryEnd < length:
-#        print(query, querySize, queryEnd, file=sys.stderr)
+        # print(query, querySize, queryEnd, file=sys.stderr)
         cigar_str.append('%dH' % (length - queryEnd))
 
     assert cigarsum == length, '%s: cigar:%s\tcigarsum=%d,length=%d' % \
@@ -197,8 +194,7 @@ def cigar(subject, query, queryStart, queryEnd, querySize):
 
 
 def print_sam_entry(record, alignment, hsp):
-    """
-    """
+    """Print the sam line."""
     to_print = copy.copy(sam_line)
     to_print[0] = record.query
     to_print[2] = alignment.hit_def
@@ -235,7 +231,9 @@ def print_sam_entry(record, alignment, hsp):
     # print(hsp.match)
     # print(hsp.sbjct)
 
+
 def main():
+    """What the main does."""
     # Usage
     try:
         filein = sys.argv[1]
@@ -265,6 +263,7 @@ def main():
     for record in blast_records_backup:
         for alignment in record.alignments:
             TC = len(alignment.hsps)  # SAM TC flag: segments in template
+            del TC
             for hsp in alignment.hsps:
                 print_sam_entry(record, alignment, hsp)
 

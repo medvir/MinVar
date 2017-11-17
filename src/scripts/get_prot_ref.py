@@ -85,7 +85,7 @@ def split_h77():
 
 def make_subtype_proteins(poly_files):
     """Extract proteins from references aligning to H77 proteins."""
-    #s_ids = [d[0] for d in acc_numbers.items()]
+    # s_ids = [d[0] for d in acc_numbers.items()]
     for target_prot in target_prots:
         for poly_file in poly_files:
             xt_prot = extract_protein(poly_file, target_prot)
@@ -160,6 +160,7 @@ def get_references():
         cml += ' -seq_start 342 -seq_stop 9374'
         with open(h77_nt_file, 'w') as f:
             subprocess.call(shlex.split(cml), stdout=f)
+
 
 if __name__ == '__main__':
     split_h77()

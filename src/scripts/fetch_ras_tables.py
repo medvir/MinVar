@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-'''Parse tables from http://onlinelibrary.wiley.com/doi/10.1002/hep.27934/full
-and write them to files'''
+"""Parse tables from http://onlinelibrary.wiley.com/doi/10.1002/hep.27934/full and write them to files."""
 import shlex
 import os.path
 import subprocess
@@ -8,14 +7,14 @@ from bs4 import BeautifulSoup
 
 # Remove page.html to download page again
 
-s = \
-'wget -O page.html http://onlinelibrary.wiley.com/doi/10.1002/hep.27934/full'
+s = 'wget -O page.html http://onlinelibrary.wiley.com/doi/10.1002/hep.27934/full'
 
 if not os.path.exists('page.html'):
     subprocess.call(shlex.split(s))
 
+
 def get_table(number):
-    '''Workhorse'''
+    """Workhorse."""
     with open("page.html") as fp:
         soup = BeautifulSoup(fp)
 
@@ -31,6 +30,7 @@ def get_table(number):
         oh.write(','.join(head) + '\n')
         for r in datasets:
             oh.write(','.join(r) + '\n')
+
 
 get_table(1)
 get_table(2)

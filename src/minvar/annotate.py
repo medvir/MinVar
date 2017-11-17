@@ -623,6 +623,7 @@ def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_fi
     real_muts = real_muts[['gene', 'wt', 'gene_pos', 'mut', 'freq']]
     real_muts.to_csv('final.csv', index=False, float_format='%6.4f')
 
+
 if __name__ == '__main__':
     main('hq_2_cns_final_recal.vcf', 'cns_final.fasta',
          'hq_2_cns_final_recal.bam', sys.argv[1])

@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-'''Parse the different output files and write a report in markdown,
-then convert it to pdf with markdown.
-'''
-
+"""Parse the different output files and write a report in markdown, then convert it to pdf with markdown."""
 import sys
 import os
 import csv
@@ -10,7 +7,7 @@ import csv
 # foo_config = resource_string(__name__, 'foo.conf')
 import pandas as pd
 
-#from common import acc_numbers, hcv_map
+# from common import acc_numbers, hcv_map
 
 # aminoacid one-letter code
 aa_set = set('GPAVLIMCFYWHKRQNEDST')
@@ -25,9 +22,9 @@ db_dir = os.path.abspath(os.path.join(dn_dir, 'db'))
 # integrase = \
 #     list(SeqIO.parse(os.path.join(db_dir, 'integrase.faa'), 'fasta'))[0]
 
-def parse_drm():
-    '''Parse drug resistance mutations listed in files db/*Variation.txt'''
 
+def parse_drm():
+    """Parse drug resistance mutations listed in files db/*Variation.txt."""
     df_list = []
     for gene, drm_file_name in [('protease', 'masterComments_PI.txt'),
                                 ('RT', 'masterComments_RTI.txt'),
@@ -47,7 +44,7 @@ def parse_drm():
     return df
 
 # def parse_region(hap1):
-#     '''Whether the region comes from protease, RT or integrase'''
+#     """Whether the region comes from protease, RT or integrase"""
 #
 #     import Alignment
 #     matched_res = []
@@ -68,7 +65,7 @@ def parse_drm():
 
 
 def write_header(handle, subtype_file=None, org_found=None):
-    '''Write header to a file in markdown format'''
+    """Write header to a file in markdown format."""
     from operator import itemgetter
     md_header = 'Drug resistance mutations detected by NGS sequencing'
     md_header += '\n' + '=' * len(md_header) + '\n\n'
@@ -88,7 +85,7 @@ def write_header(handle, subtype_file=None, org_found=None):
                            reverse=True):
             md_header += '|{: ^17}|{: ^13}|\n'.format(k, v)
     if org_found == 'HIV':
-        md_header += '''
+        md_header += """
 
 Parsing mutations
 -----------------
@@ -98,12 +95,12 @@ The list of mutations was downloaded from HIVdb and includes:
 - xyz positions on protease
 - zyx positions on RT
 - abc positions on integrase.
-'''
+"""
     print(md_header, file=handle)
 
 
 def parse_com_line():
-    '''argparse, since optparse deprecated starting from python 2.7'''
+    """argparse, since optparse deprecated starting from python 2.7."""
     import argparse
 
     parser = argparse.ArgumentParser(description='parse DRM mutations')
@@ -115,17 +112,14 @@ def parse_com_line():
 
 
 def aa_unpack(mut_string):
-    '''Helper function used to extract a set of amminoacids from the
-    merged csv files.'''
+    """Helper function used to extract a set of amminoacids from the merged csv files."""
     if not mut_string.startswith('NOT'):
         return set(mut_string)
     return aa_set - set(mut_string.split()[1])
 
 
 def parse_merged(mer_file):
-    '''This is done by hand because it was too complicated to achieve
-    this functionality with panda alone'''
-
+    """Do this by hand because it was too complicated to achieve this functionality with panda alone."""
     with open(mer_file) as csvfile:
         reader = csv.DictReader(csvfile)
         mdf = pd.DataFrame(columns=reader.fieldnames)
@@ -144,8 +138,7 @@ def parse_merged(mer_file):
 
 def main(org=None, mut_file='annotated_mutations.csv',
          subtypes_file='subtype_evidence.csv'):
-    '''What does the main do?'''
-
+    """What the main does."""
     import subprocess
 
     rh = open('report.md', 'w')
@@ -168,7 +161,7 @@ def main(org=None, mut_file='annotated_mutations.csv',
         # too complicated with panda, do it by hand
         drms = parse_merged('merged_muts_drm_annotated.csv')
         print('Shape of merged is: ', drms.shape)
-        #os.remove('merged_muts.csv')
+        # os.remove('merged_muts.csv')
 
         drms.drop(['', 'commented', 'mut_y'], axis=1, inplace=True)
         drms.rename(columns={'mut_x': 'mut'}, inplace=True)
@@ -252,6 +245,6 @@ def main(org=None, mut_file='annotated_mutations.csv',
 
 
 if __name__ == '__main__':
-    #args = parse_com_line()
+    # args = parse_com_line()
     main(org=sys.argv[1], mut_file='annotated_mutations.csv',
          subtypes_file='subtype_evidence.csv')

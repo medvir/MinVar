@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Calls lofreq to produce a vcf file"""
+"""Call lofreq to produce a vcf file."""
 
 import logging
 import os
@@ -36,11 +36,11 @@ translation_table = {
 info_fields = {}
 
 
-#def recalibrate_qualities(ref_file, bamfile, platform="454"):
 def recalibrate_qualities(ref_file, bamfile, platform="ILLUMINA"):
     """Invoke GATK BaseRecalibrator, also calling some high confidence variants.
-    Follows vipr by Andreas Wilm"""
 
+    Follows vipr by Andreas Wilm.
+    """
     bamstem, bamext = os.path.splitext(bamfile)
     assert bamext == '.bam', bamext
     recalfile = '%s_recal.bam' % bamstem
@@ -53,15 +53,13 @@ def recalibrate_qualities(ref_file, bamfile, platform="ILLUMINA"):
 
     # sample 10k reads and run lofreq to detect high confidence variants
     fraction_needed = min(1.0, round(float(10000) / mapped_reads, 3))
-    cml = shlex.split('samtools view -s %f -F 4 -h -b -o subsampled.bam %s' % \
-    (fraction_needed, bamfile))
+    cml = shlex.split('samtools view -s %f -F 4 -h -b -o subsampled.bam %s' % (fraction_needed, bamfile))
     subprocess.call(cml)
     cml = shlex.split('samtools index subsampled.bam')
     subprocess.call(cml)
 
     cml = shlex.split(
-        'lofreq call-parallel --pp-threads %d -f %s -o tmp.vcf subsampled.bam' \
-        % (min(6, CPUS), ref_file))
+        'lofreq call-parallel --pp-threads %d -f %s -o tmp.vcf subsampled.bam' % (min(6, CPUS), ref_file))
     subprocess.call(cml)
     cml = shlex.split(
         'lofreq filter -v 200 -V 2000 -a 0.40 -i tmp.vcf -o known.vcf')
@@ -81,7 +79,8 @@ def recalibrate_qualities(ref_file, bamfile, platform="ILLUMINA"):
     subprocess.call(cml)
 
     refstem = os.path.splitext(ref_file)[0]
-    cml = shlex.split('java -jar /usr/local/picard-tools/picard.jar CreateSequenceDictionary R=%s O=%s.dict' % (ref_file, refstem))
+    cml = shlex.split('java -jar /usr/local/picard-tools/picard.jar CreateSequenceDictionary R=%s O=%s.dict' %
+                      (ref_file, refstem))
     subprocess.call(cml)
 
     # first pass to parse features
@@ -102,15 +101,14 @@ def recalibrate_qualities(ref_file, bamfile, platform="ILLUMINA"):
 
 
 def indelqual(ref_file, bamfile):
-    """Use lofreq indelqual to insert indel qualities into bamfile; this allows
-    calling indels and is an alternative to GATK BaseRecalibrator
-    """
+    """Use lofreq indelqual to insert indel qualities into bamfile.
 
+    This allows calling indels and is an alternative to GATK BaseRecalibrator.
+    """
     bamstem, bamext = os.path.splitext(bamfile)
     assert bamext == '.bam', bamext
     recalfile = '%s_recal.bam' % bamstem
-    cml = shlex.split('lofreq indelqual --dindel -f %s -o %s %s' % \
-        (ref_file, recalfile, bamfile))
+    cml = shlex.split('lofreq indelqual --dindel -f %s -o %s %s' % (ref_file, recalfile, bamfile))
     subprocess.call(cml)
     # needs reindexing
     subprocess.call(shlex.split('samtools index %s' % recalfile))
@@ -120,7 +118,7 @@ def indelqual(ref_file, bamfile):
 
 def call_variants(ref_file=None, bamfile=None, parallel=True, n_regions=8,
                   caller='lofreq'):
-    """Wrapper to call lofreq (also other tools originally)"""
+    """Wrapper to call lofreq (also other tools originally)."""
     bamstem, bamext = os.path.splitext(bamfile)
     assert bamext == '.bam', bamfile + bamext
 
@@ -129,7 +127,6 @@ def call_variants(ref_file=None, bamfile=None, parallel=True, n_regions=8,
     subprocess.call(cml)
 
     # call minority variants with freebayes, lofreq or samtools/bcftools
-
     # freebayes here
     if parallel and caller == 'freebayes':
         # first compute regions
@@ -170,7 +167,7 @@ def call_variants(ref_file=None, bamfile=None, parallel=True, n_regions=8,
     # lofreq here
     elif parallel and caller == 'lofreq':
         cml = shlex.split(
-            'lofreq call-parallel --pp-threads %d --call-indels -f %s -o tmp.vcf %s' \
+            'lofreq call-parallel --pp-threads %d --call-indels -f %s -o tmp.vcf %s'
             % (min(6, CPUS), ref_file, bamfile))
         subprocess.call(cml)
     elif not parallel and caller == 'lofreq':
@@ -191,15 +188,14 @@ def call_variants(ref_file=None, bamfile=None, parallel=True, n_regions=8,
         cml = 'samtools mpileup -B -Q 20 -uf %s gr.bam > gr.mpileup' % ref_file
         subprocess.call(cml, shell=True)
         print("haploid\t1", file=open('samples.txt', 'w'))
-        cml = 'bcftools call -S samples.txt -m -v gr.mpileup >  %s.vcf' \
-            % bamstem
+        cml = 'bcftools call -S samples.txt -m -v gr.mpileup >  %s.vcf' % bamstem
         subprocess.call(cml, shell=True)
         return '%s.vcf' % bamstem
 
     # lofreq still needs filtering
     if caller == 'lofreq':
-        cml = shlex.split('lofreq filter -i tmp.vcf -o %s.vcf -v %d -a %f' % \
-            (bamstem, RAW_DEPTH_THRESHOLD, MIN_FRACTION))
+        cml = shlex.split('lofreq filter -i tmp.vcf -o %s.vcf -v %d -a %f' %
+                          (bamstem, RAW_DEPTH_THRESHOLD, MIN_FRACTION))
         subprocess.call(cml)
         os.remove('tmp.vcf')
         return '%s.vcf' % bamstem
@@ -207,8 +203,7 @@ def call_variants(ref_file=None, bamfile=None, parallel=True, n_regions=8,
 
 def main(ref_file=None, bamfile=None, parallel=True, n_regions=6,
          caller='lofreq', recalibrate=True):
-    """What does a main do?"""
-
+    """What a main does."""
     ref_file = shlex.quote(ref_file)
     bamfile = shlex.quote(bamfile)
     # call variants
@@ -238,6 +233,7 @@ def main(ref_file=None, bamfile=None, parallel=True, n_regions=6,
     called_bam = recalfile
 
     return called_file, called_bam
+
 
 if __name__ == '__main__':
     main()

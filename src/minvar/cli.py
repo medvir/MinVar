@@ -25,7 +25,7 @@ try:
     __version__ = get_distribution('minvar').version
 
 except DistributionNotFound:
-   # package is not installed
+    # package is not installed
     pass
 
 files_to_remove = [
@@ -57,7 +57,9 @@ if len(sys.argv) == 1:
     parser.print_help()
     sys.exit()
 
+
 def main(args=None):
+    """What the main does."""
     import logging
     import logging.handlers
 

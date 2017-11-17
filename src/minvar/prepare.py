@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+"""Prepare reads: filter, find organism and subtype, make consensus."""
 import gzip
 import logging
 import os
@@ -38,6 +38,7 @@ except TypeError:
 
 def pad_consensus(denovo_seq, organism, subtype):
     """denovo consensus will most likely not span the whole sequenced region.
+
     The rest of the program expects sequences of a specific length, so we pad
     the denovo sequence with the missing region.
     """
@@ -78,9 +79,7 @@ def pad_consensus(denovo_seq, organism, subtype):
 
 
 def compute_min_len(filename):
-    """Estimate distribution of sequence length and find a reasonable minimum
-    length.
-    """
+    """Estimate distribution of sequence length and find a reasonable minimum length."""
     from Bio.SeqIO.QualityIO import FastqGeneralIterator
     logging.info('Read input file to record lengths')
     if filename.endswith('.gz'):
@@ -98,7 +97,7 @@ def compute_min_len(filename):
 
 
 def filter_reads(filename, max_n, min_len=49):
-    """Use seqtk and Biopython to trim and filter low quality reads"""
+    """Use seqtk and Biopython to trim and filter low quality reads."""
     from Bio.SeqIO.QualityIO import FastqGeneralIterator
 
     # run seqtk trimfq to trim low quality ends
@@ -221,9 +220,7 @@ def find_subtype(reads_file, sampled_reads=1000, recomb=False):
 
 
 def align_reads(ref=None, reads=None, out_file=None, mapper='bwa'):
-    """Align all high quality reads to found reference with smalt,
-    convert and sort with samtools"""
-
+    """Align all high quality reads to found reference with smalt, convert and sort with samtools."""
     if mapper == 'smalt':
         cml = 'smalt index -k 7 -s 2 cnsref %s' % shlex.quote(ref)
         subprocess.call(shlex.split(cml))
@@ -255,7 +252,7 @@ def align_reads(ref=None, reads=None, out_file=None, mapper='bwa'):
 
 
 def phase_variants(reffile, varfile):
-    """Parsing variants in varfile (vcf) and applying them to reffile"""
+    """Parse variants in varfile (vcf) and applying them to reffile."""
     # from Bio.Alphabet import generic_dna
 
     # wob = {'AG': 'R', 'CT': 'Y', 'AC': 'M', 'GT': 'K', 'CG': 'S', 'AT': 'W'}
@@ -297,7 +294,7 @@ def phase_variants(reffile, varfile):
 
 def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
                    mapper='bwa', cons_caller='own'):
-    """Take reads, align to reference, return consensus file"""
+    """Take reads, align to reference, return consensus file."""
     import glob
     import time
 
@@ -420,10 +417,7 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
 
 
 def iterate_consensus(reads_file, ref_file):
-    """ Call make_consensus until convergence or for a maximum number of
-    iterations
-    """
-
+    """Call make_consensus until convergence or for a maximum number of iterations."""
     logging.info('First consensus iteration')
     iteration = 1
     # consensus from first round is saved into cns_1.fasta
@@ -467,8 +461,7 @@ def iterate_consensus(reads_file, ref_file):
 
 
 def compute_dist(file1, file2):
-    """Compute the distance in percent
-    between two sequences (given in two files)"""
+    """Compute the distance in percent between two sequences (given in two files)."""
     # alout = 'pair.needle'
     # Alignment.needle_align(file1, file2, alout, go=10, ge=1)
     # ald = Alignment.alignfile2dict([alout])
@@ -496,7 +489,7 @@ def compute_dist(file1, file2):
 
 
 def main(read_file=None, max_n_reads=200000):
-    """What does the main do?"""
+    """What the main does."""
     assert os.path.exists(read_file), 'File %s not found' % read_file
 
     min_len = compute_min_len(read_file)
