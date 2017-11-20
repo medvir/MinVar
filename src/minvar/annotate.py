@@ -214,7 +214,7 @@ def phase_mutations(bam_file, start, end):
     haps = []
     # coverage = 0
     cml = shlex.split(
-        'samtools view %s padded_consensus:%d-%d' % (bam_file, start, end))
+        'samtools view %s sample_consensus:%d-%d' % (bam_file, start, end))
     proc = subprocess.Popen(cml, stdout=subprocess.PIPE,
                             universal_newlines=True)
     with proc.stdout as handle:
@@ -501,17 +501,18 @@ def nt_freq_2_aa_freq(df_nt, frame, bam_file=None):
     df_nt = df_nt.sort_values(by=['pos', 'freq'], ascending=[True, False])
     min_pos, max_pos = min(df_nt.pos), max(df_nt.pos)
     assert max_pos - min_pos == 2, df_nt
-    codon_number = int(1 + (min_pos - frame) / 3)
+    codon_number = 1 + int((min_pos - frame) / 3)
     assert (min_pos - frame) % 3 == 0
     low_freq_positions = set(df_nt[df_nt.freq < 1.0].pos.tolist())
     if low_freq_positions == set([]):
         logging.debug('no mutated position in codon %d', codon_number)
         try:
-            aa = translation_table[''.join(df_nt.mut.tolist())]
-            return [codon_number], [aa], [1.0]
+            cod = ''.join(df_nt.mut.tolist())
+            aa = translation_table[cod]
+            return [codon_number], [aa], [1.0], [cod]
         except KeyError:
             logging.warning('frameshift mutations around pos:%d', min_pos)
-            return [], [], []
+            return [], [], [], []
     elif len(low_freq_positions) == 1:
         logging.debug('one mutated position in codon %d', codon_number)
         freqs = df_nt[df_nt.freq < 1.0].freq.tolist()
@@ -520,24 +521,30 @@ def nt_freq_2_aa_freq(df_nt, frame, bam_file=None):
         combinations = [''.join(comb) for comb in product(a[0], a[1], a[2])]
 
         aas = []
+        save_combs = []
         for i, x in enumerate(combinations):
             if '-' in x or len(x) % 3:
                 logging.warning('frameshift mutation at freq %f', freqs[i])
                 aas.extend('*')
+                save_combs.extend(x)
                 continue
             if len(x) == 3:
                 aas.extend(translation_table[x])
+                save_combs.extend(x)
             else:
-                split = [translation_table[x[i: i + 3]] for i in range(0, len(x), 3)]
-                aas.extend([''.join(split)])
+                nt_split = [x[i: i + 3] for i in range(0, len(x), 3)]
+                aa_split = [translation_table[nth] for nth in nt_split]
+                #split = [translation_table[x[i: i + 3]] for i in range(0, len(x), 3)]
+                aas.extend([''.join(aa_split)])
+                save_combs.extend([''.join(nt_split)])
 
         assert len(aas) == len(freqs), '%s - %s - %s' % (combinations, aas, freqs)
-        return [codon_number] * len(freqs), aas, freqs
+        return [codon_number] * len(freqs), aas, freqs, combinations
     else:
         logging.info('phasing needed in codon %d', codon_number)
         haps = phase_mutations(bam_file, min_pos, max_pos)
         aas = [translation_table.get(h, '*') for h in haps.mut.tolist()]
-        return [codon_number] * haps.shape[0], aas, haps.freq.tolist()
+        return [codon_number] * haps.shape[0], aas, haps.freq.tolist(), haps.mut.tolist()
 
 
 def gene_name_pos(df_in):
@@ -595,17 +602,22 @@ def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_fi
     a_pos_save = []
     aas_save = []
     freqs_save = []
+    nt_save = []
     for c in codon_positions:
         codon_muts = merged[merged.pos.isin(c)]  # extracts just the affected positions
-        a_pos, aas, freqs = nt_freq_2_aa_freq(codon_muts, frame_max, bam_file)
+        #a_pos, aas, freqs = nt_freq_2_aa_freq(codon_muts, frame_max, bam_file)
+        a_pos, aas, freqs, nts = nt_freq_2_aa_freq(codon_muts, frame_max, bam_file)
         a_pos_save.extend(a_pos)
         aas_save.extend(aas)
         freqs_save.extend(freqs)
-    all_muts_aa = pd.DataFrame({'freq': freqs_save, 'in_pos': a_pos_save, 'mut': aas_save})
+        nt_save.extend(nts)
+    all_muts_aa = pd.DataFrame({'freq': freqs_save, 'in_pos': a_pos_save, 'mut': aas_save, 'nts': nt_save})
     # join with max_freq_muts_aa on in_pos (Sample consensus positions) to obtain positions on H77/consensus_B
     all_muts_aa_full = pd.merge(max_freq_muts_aa, all_muts_aa, on='in_pos')
     all_muts_aa_full.drop(['mut_x', 'in_pos'], axis=1, inplace=True)
     all_muts_aa_full.rename(columns={'mut_y': 'mut'}, inplace=True)
+    all_muts_aa_full.to_csv('intermediate.csv', index=False, float_format='%6.4f')
+    all_muts_aa_full = all_muts_aa_full.drop(['nts'], axis=1)
     # sum over synonymous mutations
     all_muts_aa_full = all_muts_aa_full.groupby(['pos', 'wt', 'mut']).sum()
     all_muts_aa_full.reset_index(inplace=True)

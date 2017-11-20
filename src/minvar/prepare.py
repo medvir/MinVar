@@ -36,46 +36,46 @@ except TypeError:
     CPUS = 1
 
 
-def pad_consensus(denovo_seq, organism, subtype):
-    """denovo consensus will most likely not span the whole sequenced region.
-
-    The rest of the program expects sequences of a specific length, so we pad
-    the denovo sequence with the missing region.
-    """
-    if organism == 'HIV':  # use the mutation neutral consensus_B
-        ref = list(SeqIO.parse(HIV_amp, 'fasta'))[0]
-    elif organism == 'HCV':  # use the best subtype
-        if subtype == 'RF1_2k/1b':
-            ref = list(SeqIO.parse(HCV_recomb_references, 'fasta'))[0]
-            assert ref.id.startswith('AY587845')
-        else:
-            an = acc_numbers[subtype][0]
-            ref = [s for s in SeqIO.parse(HCV_references, 'fasta')
-                   if s.id.startswith(an)][0]
-    al_file = 'padalign.fasta'
-    needle_align('asis:%s' % str(ref.seq),
-                 'asis:%s' % str(denovo_seq.seq), al_file)
-
-    al_ref, al_den = [str(s.seq) for s in
-                      SeqIO.parse(al_file, 'fasta')]
-    os.remove(al_file)
-    # first non gap positions
-    den_start = len(al_den) - len(al_den.lstrip('-'))
-    den_stop = len(al_den.rstrip('-'))
-    ref_start = len(al_ref) - len(al_ref.lstrip('-'))
-    ref_stop = len(al_ref.rstrip('-'))
-    # where the shortest sequence ends
-    min_stop = min(den_stop, ref_stop)
-    # if denovo doesn't cover the beginning, take it from the reference
-    if den_start > ref_start:
-        padded = al_ref[:den_start] + al_den[den_start:min_stop]
-    else:
-        padded = al_den[ref_start:min_stop]
-    # if denovo doesn't cover the end, take it from the reference
-    if ref_stop > min_stop:
-        padded += al_ref[min_stop:ref_stop]
-
-    return padded
+# def pad_consensus(denovo_seq, organism, subtype):
+#     """denovo consensus will most likely not span the whole sequenced region.
+#
+#     The rest of the program expects sequences of a specific length, so we pad
+#     the denovo sequence with the missing region.
+#     """
+#     if organism == 'HIV':  # use the mutation neutral consensus_B
+#         ref = list(SeqIO.parse(HIV_amp, 'fasta'))[0]
+#     elif organism == 'HCV':  # use the best subtype
+#         if subtype == 'RF1_2k/1b':
+#             ref = list(SeqIO.parse(HCV_recomb_references, 'fasta'))[0]
+#             assert ref.id.startswith('AY587845')
+#         else:
+#             an = acc_numbers[subtype][0]
+#             ref = [s for s in SeqIO.parse(HCV_references, 'fasta')
+#                    if s.id.startswith(an)][0]
+#     al_file = 'padalign.fasta'
+#     needle_align('asis:%s' % str(ref.seq),
+#                  'asis:%s' % str(denovo_seq.seq), al_file, go=20.0, ge=4.0)
+#
+#     al_ref, al_den = [str(s.seq) for s in
+#                       SeqIO.parse(al_file, 'fasta')]
+#     #os.remove(al_file)
+#     # first non gap positions
+#     den_start = len(al_den) - len(al_den.lstrip('-'))
+#     den_stop = len(al_den.rstrip('-'))
+#     ref_start = len(al_ref) - len(al_ref.lstrip('-'))
+#     ref_stop = len(al_ref.rstrip('-'))
+#     # where the shortest sequence ends
+#     min_stop = min(den_stop, ref_stop)
+#     # if denovo doesn't cover the beginning, take it from the reference
+#     if den_start > ref_start:
+#         padded = al_ref[:den_start] + al_den[den_start:min_stop]
+#     else:
+#         padded = al_den[ref_start:min_stop]
+#     # if denovo doesn't cover the end, take it from the reference
+#     if ref_stop > min_stop:
+#         padded += al_ref[min_stop:ref_stop]
+#
+#     return padded
 
 
 def compute_min_len(filename):
@@ -279,20 +279,25 @@ def phase_variants(reffile, varfile):
             assert nalleles == 1
             # reference and alternate frequency
             freqs = 1. - float(infos['AF']), float(infos['AF'])
-
-            if freqs[0] < 0.5:
+            # do not put gaps in the consensus
+            if alt == '-':
+                report = ref
+            elif ref == '-':
                 report = alt
             else:
-                report = ref
+                if freqs[0] < 0.5:
+                    report = alt
+                else:
+                    report = ref
             for i, r in enumerate(report):
                 reflist[pos + i] = r
 
     finalrefseq = ''.join(reflist)
-    fs = SeqRecord(Seq(finalrefseq), id='phased', description='')
+    fs = Seq(finalrefseq)
     return fs
 
 
-def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
+def make_consensus(ref_file, reads_file, out_file, sampled_reads=10000,
                    mapper='bwa', cons_caller='own'):
     """Take reads, align to reference, return consensus file."""
     import glob
@@ -411,7 +416,8 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=4000,
         cml = shlex.split('bgzip -f calls.vcf')
         subprocess.call(cml)
 
-    SeqIO.write(phased_seq, out_file, 'fasta')
+    phased_rec = SeqRecord(phased_seq, id='sample_consensus', description='')
+    SeqIO.write(phased_rec, out_file, 'fasta')
     # del output
     return out_file, covered_fract
 
@@ -508,8 +514,7 @@ def main(read_file=None, max_n_reads=200000):
     if organism == 'HCV' and max_support < 0.85:
         try_recomb = True
         logging.info('Low support in HCV: try recombinant')
-        organism, rec_support_freqs, rec_acc = find_subtype(
-            filtered_file, recomb=True)
+        organism, rec_support_freqs, rec_acc = find_subtype(filtered_file, recomb=True)
         max_support_rec = max(rec_support_freqs.values())
 
     if try_recomb and max_support_rec > max_support:
@@ -532,20 +537,18 @@ def main(read_file=None, max_n_reads=200000):
                 print('%s,%5.4f' % (k, frequencies[k]), file=oh)
 
     ref_dict = SeqIO.to_dict(SeqIO.parse(sub_file, 'fasta'))
-    ref_rec = SeqRecord(ref_dict[s_id].seq,
-                        id=best_subtype.split('.')[0], description='')
+    ref_rec = SeqRecord(ref_dict[s_id].seq, id=best_subtype.split('.')[0], description='')
     SeqIO.write([ref_rec], 'subtype_ref.fasta', 'fasta')
     cns_file = iterate_consensus(filtered_file, 'subtype_ref.fasta')
-    os.rename(cns_file, 'denovo_consensus.fasta')
-    denovo_seq = list(SeqIO.parse('denovo_consensus.fasta', 'fasta'))[0]
-    padded = pad_consensus(denovo_seq, organism, best_subtype)
-    SeqIO.write(SeqRecord(Seq(padded), id='padded_consensus', description=''),
-                'cns_final.fasta', 'fasta')
+    #os.rename(cns_file, 'denovo_consensus.fasta')
+    os.rename(cns_file, 'cns_final.fasta')
+    #denovo_seq = list(SeqIO.parse('denovo_consensus.fasta', 'fasta'))[0]
+    #padded = pad_consensus(denovo_seq, organism, best_subtype)
+    #SeqIO.write(SeqRecord(Seq(padded), id='padded_consensus', description=''), 'cns_final.fasta', 'fasta')
     cml = shlex.split('samtools faidx cns_final.fasta')
     subprocess.call(cml)
 
-    prepared_file = align_reads(ref='cns_final.fasta', reads=filtered_file,
-                                out_file='hq_2_cns_final.bam')
+    prepared_file = align_reads(ref='cns_final.fasta', reads=filtered_file, out_file='hq_2_cns_final.bam')
 
     return 'cns_final.fasta', prepared_file, organism
 

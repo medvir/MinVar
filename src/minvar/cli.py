@@ -65,10 +65,8 @@ def main(args=None):
 
     args = parser.parse_args(args=args)
 
-    log_format = '%(levelname)s %(asctime)s %(filename)s: %(funcName)s() \
-%(lineno)d: \t%(message)s'
-    logging.basicConfig(filename='minvar.log', level=logging.INFO,
-                        format=log_format, datefmt='%Y/%m/%d %H:%M:%S')
+    log_format = '%(levelname)s %(asctime)s %(filename)s: %(funcName)s() %(lineno)d: \t%(message)s'
+    logging.basicConfig(filename='minvar.log', level=logging.INFO, format=log_format, datefmt='%Y/%m/%d %H:%M:%S')
     logging.info(' '.join(sys.argv))
 
     from minvar import prepare
@@ -83,6 +81,7 @@ def main(args=None):
     from minvar import annotate
     annotate.main(vcf_file=called_file, ref_file=cns_file, bam_file=called_bam,
                   organism=org_found)
+    # annotate.main()
     sys.exit()
     from minvar import reportdrm
     reportdrm.main(org_found)
