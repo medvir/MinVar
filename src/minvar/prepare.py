@@ -13,8 +13,7 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from pkg_resources import resource_filename
 
-from .Alignment import needle_align
-from .common import acc_numbers, hcv_map, org_dict
+from .common import hcv_map, org_dict
 from .stats import genome_coverage
 
 dn_dir = os.path.dirname(os.path.abspath(__file__))
@@ -506,25 +505,28 @@ def main(read_file=None, max_n_reads=200000):
     # infer organism and subtype
     organism, support_freqs, acc = find_subtype(filtered_file)
     logging.info('%s sequences detected', organism)
-    try_recomb = False
     max_support = max(support_freqs.values())
 
     # check if there is better support for recombinant (HCV only)
     max_support_rec = 0
-    if organism == 'HCV' and max_support < 0.85:
-        try_recomb = True
-        logging.info('Low support in HCV: try recombinant')
-        organism, rec_support_freqs, rec_acc = find_subtype(filtered_file, recomb=True)
-        max_support_rec = max(rec_support_freqs.values())
-
-    if try_recomb and max_support_rec > max_support:
-        logging.info('support improved: using recombinant')
-        sub_file = HCV_recomb_references
-        frequencies = rec_support_freqs
-        s_id = rec_acc
-    else:
-        logging.info('support not improved (or HIV): using non recombinant')
-        sub_file = HCV_references
+    if organism == 'HCV':
+        max_support_rec = 0.0
+        if max_support < 0.85:
+            logging.info('Low support in HCV: try recombinant')
+            organism, rec_support_freqs, rec_acc = find_subtype(filtered_file, recomb=True)
+            max_support_rec = max(rec_support_freqs.values())
+        if max_support_rec > max_support:
+            logging.info('Using recombinant')
+            sub_file = HCV_recomb_references
+            frequencies = rec_support_freqs
+            s_id = rec_acc
+        elif max_support_rec <= max_support:
+            logging.info('Using non recombinant')
+            sub_file = HCV_references
+            frequencies = support_freqs
+            s_id = acc
+    elif organism == 'HIV':
+        sub_file = HIV_references
         frequencies = support_freqs
         s_id = acc
 
@@ -535,7 +537,7 @@ def main(read_file=None, max_n_reads=200000):
         for k in sorted_freqs:
             if frequencies[k]:
                 print('%s,%5.4f' % (k, frequencies[k]), file=oh)
-
+    logging.info('Looking for best reference in file %s', sub_file)
     ref_dict = SeqIO.to_dict(SeqIO.parse(sub_file, 'fasta'))
     ref_rec = SeqRecord(ref_dict[s_id].seq, id=best_subtype.split('.')[0], description='')
     SeqIO.write([ref_rec], 'subtype_ref.fasta', 'fasta')
