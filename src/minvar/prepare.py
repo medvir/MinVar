@@ -14,7 +14,7 @@ from Bio.SeqRecord import SeqRecord
 from pkg_resources import resource_filename
 
 from .common import hcv_map, org_dict
-from .stats import genome_coverage
+from .stats import (genome_coverage, genome_longest_covered)
 
 dn_dir = os.path.dirname(os.path.abspath(__file__))
 HCV_references = resource_filename(__name__, 'db/HCV/subtype_references.fasta')
@@ -118,7 +118,7 @@ def filter_reads(filename, max_n, min_len=49):
 
 
 def find_subtype(reads_file, sampled_reads=1000, recomb=False):
-    """"""
+    """Blast a subset of reads against references to infer organism and support for group/subtype."""
     import fileinput
     import pandas as pd
 
@@ -300,9 +300,9 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=10000,
                    mapper='bwa', cons_caller='own'):
     """Take reads, align to reference, return consensus file."""
     import glob
-    import time
+    from time import perf_counter
 
-    pf = time.perf_counter()
+    pf = perf_counter()
     ranseed = int(str(pf).split('.')[1][-5:])
 
     # sample reads
@@ -356,14 +356,6 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=10000,
         view.stdout.close()
         output = sort.communicate()[0]
 
-    elif mapper == 'novo':
-        logging.info('mapping with novoalign')
-        cml = 'novoindex tmpref.ndx %s' % ref_file
-        subprocess.call(cml, shell=True)
-        cml = 'novoalign -c %d -d tmpref.ndx -f hq_smp.fastq -F STDFQ -o SAM > refcon.sam' % min(12, CPUS)
-        subprocess.call(cml, shell=True)
-        os.remove('tmpref.ndx')
-
     os.remove('refcon.sam')
     cml = shlex.split('samtools index refcon_sorted.bam')
     subprocess.call(cml)
@@ -380,7 +372,7 @@ def make_consensus(ref_file, reads_file, out_file, sampled_reads=10000,
         with open('calls.vcf') as ch:
             for l in ch:
                 if not l.startswith('#'):
-                    logging.ionfo('variants are present')
+                    logging.info('variants are present')
                     var_pres = True
                     break
 
@@ -467,20 +459,6 @@ def iterate_consensus(reads_file, ref_file):
 
 def compute_dist(file1, file2):
     """Compute the distance in percent between two sequences (given in two files)."""
-    # alout = 'pair.needle'
-    # Alignment.needle_align(file1, file2, alout, go=10, ge=1)
-    # ald = Alignment.alignfile2dict([alout])
-    # #os.remove(alout)
-    # k1 = list(ald.keys())[0]
-    # k2 = list(ald[k1].keys())[0]
-    # ali = ald[k1][k2]
-    # ali.summary()
-    # #ratio1 = float(ali.ident) / (ali.ident + ali.mismatches)
-    # al_len = ali.stop - ali.start + 1
-    # dh = 100 * float(ali.mismatches) / al_len
-    # gaps = ali.insertions + ali.deletions
-    # return dh, gaps
-
     cml = shlex.split(
         'blastn -gapopen 20 -gapextend 2 -query %s -subject %s -out pair.tsv \
          -outfmt "6 qseqid sseqid pident gaps"' % (shlex.quote(file1), shlex.quote(file2))
@@ -508,13 +486,14 @@ def main(read_file=None, max_n_reads=200000):
     max_support = max(support_freqs.values())
 
     # check if there is better support for recombinant (HCV only)
-    max_support_rec = 0
+    max_support_rec = 0.0
     if organism == 'HCV':
-        max_support_rec = 0.0
+        # if support is good, don't even try recombinants
         if max_support < 0.85:
             logging.info('Low support in HCV: try recombinant')
             organism, rec_support_freqs, rec_acc = find_subtype(filtered_file, recomb=True)
             max_support_rec = max(rec_support_freqs.values())
+        # max_support_rec is 0.0, unless explicitely computed
         if max_support_rec > max_support:
             logging.info('Using recombinant')
             sub_file = HCV_recomb_references
@@ -542,8 +521,12 @@ def main(read_file=None, max_n_reads=200000):
     ref_rec = SeqRecord(ref_dict[s_id].seq, id=best_subtype.split('.')[0], description='')
     SeqIO.write([ref_rec], 'subtype_ref.fasta', 'fasta')
     cns_file = iterate_consensus(filtered_file, 'subtype_ref.fasta')
-    #os.rename(cns_file, 'denovo_consensus.fasta')
-    os.rename(cns_file, 'cns_final.fasta')
+    # extract the longest region covered by at least 100 reads and save that
+    longest_covered = genome_longest_covered('refcon_sorted.bam')
+    all_ref = list(SeqIO.parse(cns_file, 'fasta'))[0]
+    all_ref.seq = all_ref.seq[longest_covered['start'] - 1:longest_covered['stop']]
+    SeqIO.write(all_ref, 'cns_final.fasta', 'fasta')
+    #os.rename(cns_file, 'cns_final.fasta')
     #denovo_seq = list(SeqIO.parse('denovo_consensus.fasta', 'fasta'))[0]
     #padded = pad_consensus(denovo_seq, organism, best_subtype)
     #SeqIO.write(SeqRecord(Seq(padded), id='padded_consensus', description=''), 'cns_final.fasta', 'fasta')

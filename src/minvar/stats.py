@@ -4,9 +4,6 @@ import sys
 import shlex
 import subprocess
 
-# from pkg_resources import resource_filename
-# bed_file = resource_filename(__name__, 'db/consensus_B.bed')
-
 
 def coverage_stats_per_base(bam_file, bed_file):
     """Compute the coverage for the different genes by invoking samtools bedcov."""
@@ -57,10 +54,45 @@ def genome_coverage(bam_file, threshold=5):
         if depth >= threshold:
             cov_fract += fract
             cov_pos += positions
-
     return cov_fract, cov_pos
+
+
+def genome_longest_covered(bam_file, threshold=20):
+    """Invoke bedtools to find the longest/most covered contiguous region."""
+    import os
+    import pandas as pd
+    # The command used is:
+    # bedtools genomecov -ibam refcon_sorted.bam -bg | awk '$4 > threshold' | bedtools cluster -i -
+    # giving a file with lines whose meaning is
+    # chr          start    stop  coverage   cluster
+    # e.g.
+    # CONSENSUS_B     56      59      101     1
+
+    # convert coverage into bedgraph format, only keep regions above threshold
+    cml = shlex.split('bedtools genomecov -ibam %s -bg' % bam_file)
+    proc = subprocess.Popen(cml, stdout=subprocess.PIPE, universal_newlines=True)
+    with proc.stdout as reading, open('covfile.txt', 'w+') as writing:
+        for l in reading:
+            lsp = l.strip().split('\t')
+            cov = int(lsp[3])
+            if cov >= threshold:
+                writing.write(l)
+
+    # cluster adiacent entries in covfile
+    cml = shlex.split('bedtools cluster -i covfile.txt')
+    with open('clusters.txt', 'w+') as oh:
+        subprocess.call(cml, stdout=oh, universal_newlines=True)
+    # read them in a dataframe, compute the lenght of each region and return the longest
+    df = pd.read_table('clusters.txt', header=None, names=['chr', 'start', 'stop', 'coverage', 'cluster'])
+    clusters = df.groupby('cluster').agg({'start':'min', 'stop':'max'}).reset_index()
+    clusters['length'] = clusters['stop'] - clusters['start']
+    best = clusters.loc[clusters['length'].idxmax()]
+    os.remove('covfile.txt')
+    os.remove('clusters.txt')
+    return best.to_dict()
 
 
 if __name__ == "__main__" and __package__ is None:
     # coverage_stats_per_base(sys.argv[1], sys.argv[2])
-    genome_coverage(sys.argv[1])
+    glg = genome_longest_covered(sys.argv[1], 400)
+    print(glg)
