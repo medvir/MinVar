@@ -377,8 +377,8 @@ def compute_org_mutations(aa_sequence, org_found):
     alih.summary()
     if 3 * alih.mismatches > alih.ident:
         warnings.warn('Too many mismatches in parsing mutations')
-    else:
-        os.remove('parse.tmp')
+    #else:
+    #    os.remove('parse.tmp')
     org_seq, in_seq = alih.seq_a.upper(), alih.seq_b.upper()
     end_org, end_in = len(org_seq.rstrip('-')), len(in_seq.rstrip('-'))
     end_pos = min(end_org, end_in)
@@ -605,7 +605,6 @@ def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_fi
     nt_save = []
     for c in codon_positions:
         codon_muts = merged[merged.pos.isin(c)]  # extracts just the affected positions
-        #a_pos, aas, freqs = nt_freq_2_aa_freq(codon_muts, frame_max, bam_file)
         a_pos, aas, freqs, nts = nt_freq_2_aa_freq(codon_muts, frame_max, bam_file)
         a_pos_save.extend(a_pos)
         aas_save.extend(aas)

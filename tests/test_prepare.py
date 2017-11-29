@@ -6,8 +6,7 @@ import tempfile
 import pytest
 from Bio import SeqIO
 
-from src.minvar.prepare import (compute_min_len, find_subtype,
-                                iterate_consensus, pad_consensus)
+from src.minvar.prepare import (compute_min_len, find_subtype, iterate_consensus, disambiguate)
 
 minvar_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 cbfile = os.path.join(minvar_dir, 'src/minvar/db/HIV/consensus_B.fna')
@@ -17,37 +16,17 @@ rec_hcv_file = os.path.join(minvar_dir,
 hcv_middle = list(SeqIO.parse(rec_hcv_file, 'fasta'))[0]
 
 
-# @pytest.mark.skip(reason="no way of currently testing this")
-def test_HIV_length():
-    # a sequence from the middle of the reference
-    m = pad_consensus(hiv_middle[100:500], 'HIV', 'whatever')
-    assert len(m) == 3012
-    # from the beginning
-    m = pad_consensus(hiv_middle[:500], 'HIV', 'whatever')
-    assert len(m) == 3012
-    # from the end
-    m = pad_consensus(hiv_middle[-500:], 'HIV', 'whatever')
-    assert len(m) == 3012
-    # longer on the left
-    lotl = 'AGACTAGCCGATCAGCATCAGCA' + hiv_middle[:100]
-    m = pad_consensus(lotl, 'HIV', 'whatever')
-    assert len(m) == 3012
-    # longer on the right
-    lotl = hiv_middle[-100:] + 'AAGCGCATCGACATCAGCA'
-    m = pad_consensus(lotl, 'HIV', 'whatever')
-    assert len(m) == 3012
-
-
-@pytest.mark.skip(reason="no way of currently testing this")
-def test_HCV_recomb_length():
-    m = pad_consensus(hcv_middle, 'HCV', 'RF1_2k/1b')
-    assert len(m) == 9357
-
-    m = pad_consensus(hcv_middle[:256], 'HCV', 'RF1_2k/1b')
-    assert len(m) == 9357
-
-    m = pad_consensus(hcv_middle[-256:], 'HCV', 'RF1_2k/1b')
-    assert len(m) == 9357
+def test_disambiguate():
+    """Test disambiguate"""
+    d1 = 'ACGTAGCTAGCAT'
+    d1d = disambiguate(d1)
+    assert d1 == d1d
+    d2 = 'ACGTARWYCTAGCAT'
+    d2d = disambiguate(d2)
+    assert 'R' not in d2d
+    assert 'W' not in d2d
+    assert 'Y' not in d2d
+    assert len(d2d) == len(d2)
 
 
 def test_compute_min_len():
@@ -85,6 +64,7 @@ def test_find_subtype():
     # test hiv
     os.chdir(tmpdir)
     org, bs, sf = find_subtype(hiv_fastq)
+    del sf
     assert org == 'HIV'
     assert bs == 'CONSENSUS_B'
 

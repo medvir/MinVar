@@ -91,10 +91,10 @@ def test_parsevar():
 
 
 def test_find_frame():
-    frame, nt_framed, aa_framed = find_frame(ref_1)
+    frame, aa_framed = find_frame(ref_1)
     assert frame == 3
-    assert len(nt_framed) % 3 == 0
-    assert str(nt_framed)[-1] == 'T'
+    # assert len(nt_framed) % 3 == 0
+    # assert str(nt_framed)[-1] == 'T'
     assert aa_framed == 'IYQYMDDLYVGSDLEIGQHRTKIEELRQHLLRWGFTTPDKKHQKEPPFL'
 
 @pytest.mark.skip(reason='Rewriting this')

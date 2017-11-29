@@ -35,6 +35,13 @@ except TypeError:
     CPUS = 1
 
 
+def disambiguate(dna_string):
+    """Removes ambiguous bases from a sequence"""
+    from random import choice
+    d2a = {'AG': 'R', 'CT': 'Y', 'AC': 'M', 'GT': 'K', 'CG': 'S', 'AT': 'W'}
+    wobbles = {v: k for k, v in d2a.items()}
+    out_seq = [s if s not in wobbles.keys() else choice(wobbles[s]) for s in dna_string]
+    return ''.join(out_seq)
 # def pad_consensus(denovo_seq, organism, subtype):
 #     """denovo consensus will most likely not span the whole sequenced region.
 #
@@ -253,9 +260,6 @@ def align_reads(ref=None, reads=None, out_file=None, mapper='bwa'):
 def phase_variants(reffile, varfile):
     """Parse variants in varfile (vcf) and applying them to reffile."""
     # from Bio.Alphabet import generic_dna
-
-    # wob = {'AG': 'R', 'CT': 'Y', 'AC': 'M', 'GT': 'K', 'CG': 'S', 'AT': 'W'}
-
     logging.info('Phasing file %s with variants in %s', reffile, varfile)
     refseq = list(SeqIO.parse(reffile, 'fasta'))[0]
     reflist = list(str(refseq.seq))
@@ -524,7 +528,8 @@ def main(read_file=None, max_n_reads=200000):
     # extract the longest region covered by at least 100 reads and save that
     longest_covered = genome_longest_covered('refcon_sorted.bam')
     all_ref = list(SeqIO.parse(cns_file, 'fasta'))[0]
-    all_ref.seq = all_ref.seq[longest_covered['start'] - 1:longest_covered['stop']]
+    covered_dna = str(all_ref.seq[longest_covered['start'] - 1:longest_covered['stop']])
+    all_ref.seq = Seq(disambiguate(covered_dna))
     SeqIO.write(all_ref, 'cns_final.fasta', 'fasta')
     #os.rename(cns_file, 'cns_final.fasta')
     #denovo_seq = list(SeqIO.parse('denovo_consensus.fasta', 'fasta'))[0]
