@@ -6,3 +6,9 @@ my.key.pub
 rtd/images/merged_truth_*csv
 .eggs/
 MinVar.egg-info/
+build/
+dist/
+files.txt
+.tox/
+minvarenv/
+.cache/

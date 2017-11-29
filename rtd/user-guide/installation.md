@@ -1,4 +1,10 @@
-## Installation (work in progress)
+## Installation
+[![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat-square)](http://bioconda.github.io/recipes/minvar/README.html)
+
+The easiest way to install MinVar is via bioconda. Click on the image above
+and follow the instructions there.
+
+Here below we explain how to install with [ansible](http://www.ansible.com).
 
 A condensed list of dependencies
 
