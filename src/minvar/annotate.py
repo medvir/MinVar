@@ -210,7 +210,7 @@ def phase_mutations(bam_file, start, end):
     really occur together.
     """
     from collections import Counter
-    logging.info('looking for mutations on the same codon to be phased')
+    logging.debug('looking for mutations on the same codon to be phased')
     haps = []
     # coverage = 0
     cml = shlex.split(
@@ -226,7 +226,7 @@ def phase_mutations(bam_file, start, end):
             # reg = read[start - pos:start - pos + 3]
             haps.append(read[start - pos:start - pos + 3])
             # coverage += 1
-    logging.info('position:%d', start)
+    logging.debug('position:%d', start)
     cnt = Counter(haps)
     coverage = sum(cnt.values())
     freq_here = [float(count) / coverage for item, count in cnt.items()]

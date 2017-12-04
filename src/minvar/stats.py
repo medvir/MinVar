@@ -68,6 +68,8 @@ def genome_longest_covered(bam_file, threshold=20):
     # e.g.
     # CONSENSUS_B     56      59      101     1
 
+    # WATCH OUT: this seems to be 0-based
+
     # convert coverage into bedgraph format, only keep regions above threshold
     cml = shlex.split('bedtools genomecov -ibam %s -bg' % bam_file)
     proc = subprocess.Popen(cml, stdout=subprocess.PIPE, universal_newlines=True)

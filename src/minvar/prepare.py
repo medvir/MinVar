@@ -23,9 +23,8 @@ HCV_recomb_references = \
     resource_filename(__name__, 'db/HCV/recomb_references.fasta')
 HIV_recomb_references = \
     resource_filename(__name__, 'db/HIV/recomb_references.fasta')
-blast2sam_exe = 'blast2sam'  # resource_filename(__name__, '../scripts/blast2sam.py')
+blast2sam_exe = 'blast2sam'
 HIV_amp = resource_filename(__name__, 'db/HIV/consensus_B.fna')
-# HCV_amp =
 
 qual_thresh = 20
 
@@ -42,46 +41,6 @@ def disambiguate(dna_string):
     wobbles = {v: k for k, v in d2a.items()}
     out_seq = [s if s not in wobbles.keys() else choice(wobbles[s]) for s in dna_string]
     return ''.join(out_seq)
-# def pad_consensus(denovo_seq, organism, subtype):
-#     """denovo consensus will most likely not span the whole sequenced region.
-#
-#     The rest of the program expects sequences of a specific length, so we pad
-#     the denovo sequence with the missing region.
-#     """
-#     if organism == 'HIV':  # use the mutation neutral consensus_B
-#         ref = list(SeqIO.parse(HIV_amp, 'fasta'))[0]
-#     elif organism == 'HCV':  # use the best subtype
-#         if subtype == 'RF1_2k/1b':
-#             ref = list(SeqIO.parse(HCV_recomb_references, 'fasta'))[0]
-#             assert ref.id.startswith('AY587845')
-#         else:
-#             an = acc_numbers[subtype][0]
-#             ref = [s for s in SeqIO.parse(HCV_references, 'fasta')
-#                    if s.id.startswith(an)][0]
-#     al_file = 'padalign.fasta'
-#     needle_align('asis:%s' % str(ref.seq),
-#                  'asis:%s' % str(denovo_seq.seq), al_file, go=20.0, ge=4.0)
-#
-#     al_ref, al_den = [str(s.seq) for s in
-#                       SeqIO.parse(al_file, 'fasta')]
-#     #os.remove(al_file)
-#     # first non gap positions
-#     den_start = len(al_den) - len(al_den.lstrip('-'))
-#     den_stop = len(al_den.rstrip('-'))
-#     ref_start = len(al_ref) - len(al_ref.lstrip('-'))
-#     ref_stop = len(al_ref.rstrip('-'))
-#     # where the shortest sequence ends
-#     min_stop = min(den_stop, ref_stop)
-#     # if denovo doesn't cover the beginning, take it from the reference
-#     if den_start > ref_start:
-#         padded = al_ref[:den_start] + al_den[den_start:min_stop]
-#     else:
-#         padded = al_den[ref_start:min_stop]
-#     # if denovo doesn't cover the end, take it from the reference
-#     if ref_stop > min_stop:
-#         padded += al_ref[min_stop:ref_stop]
-#
-#     return padded
 
 
 def compute_min_len(filename):
@@ -199,31 +158,6 @@ def find_subtype(reads_file, sampled_reads=1000, recomb=False):
 
     return organism, freq2, max_acc
 
-    # if best_hit.pident < 97.:
-    #     warnings.warn('Low identity (%5.3f)' % best_hit.pident)
-    #     alarm += 1
-    # if best_hit.qcovs < 95.:
-    #     warnings.warn('Low coverage (%5.3f)' % best_hit.qcovs)
-    #     alarm += 1
-    # if best_hit.length < 100:
-    #     warnings.warn('Short match (%d)' % best_hit.length)
-    #     alarm += 1
-    #
-    # if remote:
-    #     warnings.warn('Too many warnings: running remotely.')
-    #     blast_cmline = 'blastn -task megablast -query sample_hq.fasta -db nr'
-    #     blast_cmline += ' -remote -entrez_query \"hiv1[organism]\"'
-    #     blast_cmline += ' -outfmt 6 -out remote_results.tsv'
-    #     bout = subprocess.check_output(blast_cmline, shell=True,
-    #                                    universal_newlines=True)
-    #     cols = ['qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen',
-    #             'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore']
-    #     hits = pd.read_csv('remote_results.tsv', names=cols, delimiter="\t")
-    #     best_hit = hits.iloc[0]
-    #     return best_hit.sseqid
-    #
-    # return
-
 
 def align_reads(ref=None, reads=None, out_file=None, mapper='bwa'):
     """Align all high quality reads to found reference with smalt, convert and sort with samtools."""
@@ -295,9 +229,7 @@ def phase_variants(reffile, varfile):
             for i, r in enumerate(report):
                 reflist[pos + i] = r
 
-    finalrefseq = ''.join(reflist)
-    fs = Seq(finalrefseq)
-    return fs
+    return Seq(''.join(reflist))
 
 
 def make_consensus(ref_file, reads_file, out_file, sampled_reads=10000,
@@ -433,7 +365,7 @@ def iterate_consensus(reads_file, ref_file):
     logging.info('distance = %6.4f percent', dh)
     logging.info('covered = %6.4f ', new_cov)
 
-    if dh < 2:
+    if dh < 1:
         logging.info('Converged at first step')
         return cns_file_1
 
@@ -525,10 +457,11 @@ def main(read_file=None, max_n_reads=200000):
     ref_rec = SeqRecord(ref_dict[s_id].seq, id=best_subtype.split('.')[0], description='')
     SeqIO.write([ref_rec], 'subtype_ref.fasta', 'fasta')
     cns_file = iterate_consensus(filtered_file, 'subtype_ref.fasta')
+    logging.info('Consensus in file %s', cns_file)
     # extract the longest region covered by at least 100 reads and save that
     longest_covered = genome_longest_covered('refcon_sorted.bam')
     all_ref = list(SeqIO.parse(cns_file, 'fasta'))[0]
-    covered_dna = str(all_ref.seq[longest_covered['start'] - 1:longest_covered['stop']])
+    covered_dna = str(all_ref.seq[longest_covered['start']:longest_covered['stop']])
     all_ref.seq = Seq(disambiguate(covered_dna))
     SeqIO.write(all_ref, 'cns_final.fasta', 'fasta')
     #os.rename(cns_file, 'cns_final.fasta')
