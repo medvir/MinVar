@@ -481,7 +481,9 @@ def df_2_sequence(df_in):
         max_freq_idx = df_in.groupby(['pos'])['freq'].transform(max) == df_in['freq']
         df_in = df_in[max_freq_idx]
     df_in = df_in.sort_values(by='pos', ascending=True)
-    return ''.join(df_in.mut.tolist())
+    # extract first nt in case of insertions
+    df_in['single_mut'] = df_in.apply(lambda row: row['mut'][0], axis=1)
+    return ''.join(df_in.single_mut.tolist())
 
 
 def nt_freq_2_aa_freq(df_nt, frame, bam_file=None):
@@ -504,6 +506,7 @@ def nt_freq_2_aa_freq(df_nt, frame, bam_file=None):
     codon_number = 1 + int((min_pos - frame) / 3)
     assert (min_pos - frame) % 3 == 0
     low_freq_positions = set(df_nt[df_nt.freq < 1.0].pos.tolist())
+
     if low_freq_positions == set([]):
         logging.debug('no mutated position in codon %d', codon_number)
         try:
@@ -537,7 +540,6 @@ def nt_freq_2_aa_freq(df_nt, frame, bam_file=None):
                 #split = [translation_table[x[i: i + 3]] for i in range(0, len(x), 3)]
                 aas.extend([''.join(aa_split)])
                 save_combs.extend([''.join(nt_split)])
-
         assert len(aas) == len(freqs), '%s - %s - %s' % (combinations, aas, freqs)
         return [codon_number] * len(freqs), aas, freqs, combinations
     else:
@@ -610,10 +612,11 @@ def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_fi
         aas_save.extend(aas)
         freqs_save.extend(freqs)
         nt_save.extend(nts)
-    all_muts_aa = pd.DataFrame({'freq': freqs_save, 'in_pos': a_pos_save, 'mut': aas_save, 'nts': nt_save})
+    all_muts_aa = pd.DataFrame({'freq': freqs_save, 'pos': a_pos_save, 'mut': aas_save, 'nts': nt_save})
     # join with max_freq_muts_aa on in_pos (Sample consensus positions) to obtain positions on H77/consensus_B
-    all_muts_aa_full = pd.merge(max_freq_muts_aa, all_muts_aa, on='in_pos')
-    all_muts_aa_full.drop(['mut_x', 'in_pos'], axis=1, inplace=True)
+    all_muts_aa_full = pd.merge(max_freq_muts_aa, all_muts_aa, on='pos')
+    #all_muts_aa_full.drop(['mut_x', 'in_pos'], axis=1, inplace=True)
+    all_muts_aa_full.drop(['mut_x'], axis=1, inplace=True)
     all_muts_aa_full.rename(columns={'mut_y': 'mut'}, inplace=True)
     all_muts_aa_full.to_csv('intermediate.csv', index=False, float_format='%6.4f')
     all_muts_aa_full = all_muts_aa_full.drop(['nts'], axis=1)
