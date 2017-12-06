@@ -232,14 +232,12 @@ def phase_variants(reffile, varfile):
     return Seq(''.join(reflist))
 
 
-def make_consensus(ref_file, reads_file, out_file, sampled_reads=10000,
-                   mapper='bwa', cons_caller='own'):
+def make_consensus(ref_file, reads_file, iteration, sampled_reads=10000, mapper='bwa', cons_caller='own'):
     """Take reads, align to reference, return consensus file."""
     import glob
-    from time import perf_counter
 
-    pf = perf_counter()
-    ranseed = int(str(pf).split('.')[1][-5:])
+    out_file = 'cns_%d.fasta' % iteration
+    ranseed = 313 + iteration
 
     # sample reads
     cml = shlex.split('seqtk sample -s %d %s %d'
@@ -355,7 +353,7 @@ def iterate_consensus(reads_file, ref_file):
     iteration = 1
     # consensus from first round is saved into cns_1.fasta
     cns_file_1, new_cov = make_consensus(
-        ref_file, reads_file, out_file='cns_%d.fasta' % iteration,
+        ref_file, reads_file, iteration,
         sampled_reads=5000, mapper='blast')
     try:
         os.rename('calls.vcf.gz', 'calls_%d.vcf.gz' % iteration)
@@ -370,19 +368,17 @@ def iterate_consensus(reads_file, ref_file):
         return cns_file_1
 
     while iteration <= 10:
-        logging.info('iteration %d', iteration + 1)
+        iteration += 1
+        logging.info('iteration %d', iteration)
         # use cns_1.fasta for further consensus rounds
-
-        new_cons, new_cov = make_consensus(
-            'cns_%d.fasta' % iteration, reads_file,
-            out_file='cns_%d.fasta' % (iteration + 1),
-            sampled_reads=10000, mapper='bwa')
+        new_cons, new_cov = make_consensus('cns_%d.fasta' % (iteration - 1), reads_file, iteration,
+                                           sampled_reads=10000, mapper='bwa')
         try:
-            os.rename('calls.vcf.gz', 'calls_%d.vcf.gz' % (iteration + 1))
+            os.rename('calls.vcf.gz', 'calls_%d.vcf.gz' % iteration)
         except FileNotFoundError:
             logging.info('No variants found in making consensus')
-        assert new_cons == 'cns_%d.fasta' % (iteration + 1)
-        iteration += 1
+        assert new_cons == 'cns_%d.fasta' % iteration
+
         dh = compute_dist('cns_%d.fasta' % iteration, new_cons)
         logging.info('distance is %6.4f', dh)
         logging.info('covered is %6.4f', new_cov)
@@ -465,10 +461,6 @@ def main(read_file=None, max_n_reads=200000):
     all_ref.seq = Seq(disambiguate(covered_dna))
     logging.info('writing an unambiguous sequence of length %d to cns_final.fasta', len(all_ref.seq))
     SeqIO.write(all_ref, 'cns_final.fasta', 'fasta')
-    #os.rename(cns_file, 'cns_final.fasta')
-    #denovo_seq = list(SeqIO.parse('denovo_consensus.fasta', 'fasta'))[0]
-    #padded = pad_consensus(denovo_seq, organism, best_subtype)
-    #SeqIO.write(SeqRecord(Seq(padded), id='padded_consensus', description=''), 'cns_final.fasta', 'fasta')
     cml = shlex.split('samtools faidx cns_final.fasta')
     subprocess.call(cml)
 

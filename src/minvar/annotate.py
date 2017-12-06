@@ -264,8 +264,7 @@ def compute_org_mutations(aa_sequence, org_found):
     if 3 * alih.mismatches > alih.ident:
         warnings.warn('Too many mismatches in parsing mutations')
         logging.warning('In parsing mutations mismatches: %d ident:%d', alih.mismatches, alih.ident)
-    #else:
-    #    os.remove('parse.tmp')
+
     org_seq, in_seq = alih.seq_a.upper(), alih.seq_b.upper()
     end_org, end_in = len(org_seq.rstrip('-')), len(in_seq.rstrip('-'))
     end_pos = min(end_org, end_in)
@@ -424,7 +423,6 @@ def nt_freq_2_aa_freq(df_nt, frame, bam_file=None):
             else:
                 nt_split = [x[i: i + 3] for i in range(0, len(x), 3)]
                 aa_split = [translation_table[nth] for nth in nt_split]
-                #split = [translation_table[x[i: i + 3]] for i in range(0, len(x), 3)]
                 aas.extend([''.join(aa_split)])
                 save_combs.extend([''.join(nt_split)])
         assert len(aas) == len(freqs), '%s - %s - %s' % (combinations, aas, freqs)

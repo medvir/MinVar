@@ -86,7 +86,7 @@ def genome_longest_covered(bam_file, threshold=20):
         subprocess.call(cml, stdout=oh, universal_newlines=True)
     # read them in a dataframe, compute the lenght of each region and return the longest
     df = pd.read_table('clusters.txt', header=None, names=['chr', 'start', 'stop', 'coverage', 'cluster'])
-    clusters = df.groupby('cluster').agg({'start':'min', 'stop':'max'}).reset_index()
+    clusters = df.groupby('cluster').agg({'start': 'min', 'stop': 'max'}).reset_index()
     clusters['length'] = clusters['stop'] - clusters['start']
     best = clusters.loc[clusters['length'].idxmax()]
     os.remove('covfile.txt')
