@@ -463,6 +463,7 @@ def main(read_file=None, max_n_reads=200000):
     all_ref = list(SeqIO.parse(cns_file, 'fasta'))[0]
     covered_dna = str(all_ref.seq[longest_covered['start']:longest_covered['stop']])
     all_ref.seq = Seq(disambiguate(covered_dna))
+    logging.info('writing an unambiguous sequence of length %d to cns_final.fasta', len(all_ref.seq))
     SeqIO.write(all_ref, 'cns_final.fasta', 'fasta')
     #os.rename(cns_file, 'cns_final.fasta')
     #denovo_seq = list(SeqIO.parse('denovo_consensus.fasta', 'fasta'))[0]

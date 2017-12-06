@@ -238,120 +238,6 @@ def phase_mutations(bam_file, start, end):
     assert abs(haps.freq.sum() - 1.0) < 1.E-4
     return haps
 
-    # for k, v in sorted(haps.items(), key=itemgetter(1), reverse=True):
-    #     freq_here = float(v) / coverage
-    #     if freq_here > HAPLO_FREQ_THRESHOLD and len(k) > 1:
-    #         for disp in range(3):
-    #             try:
-    #                 muts = muts[muts.pos != t[0] + disp]
-    #             except ValueError:
-    #                 pass
-    #         d_here = {'wt': 'XYZ', 'pos': t[0], 'mut': k, 'freq': freq_here}
-    #         pm = pm.append(d_here, ignore_index=True)
-    #         logging.info('hap: %s freq:%f', k, freq_here)
-    # logging.info('<------>')
-    # muts = muts.reset_index()
-    # pm = pm.reset_index()
-    # phased_muts = pd.concat([muts, pm], ignore_index=True)
-    # phased_muts.pos = phased_muts.pos.astype(int)
-    # phased_muts = phased_muts.sort_values(
-    #     by=['pos', 'freq'], ascending=[True, False])
-    # phased_muts = phased_muts.drop('index', axis=1)
-    #
-    # # find mutation positions appearing together in a codon, save in targets
-    # pm = pd.DataFrame(columns=['wt', 'pos', 'mut', 'freq'])
-    # # mut_pos = set(muts.pos)
-    # targets = []
-    # # list all codons
-    # for i in range(frame, 15000, 3):
-    #     codon_pos = set([i, i + 1, i + 2])
-    #     # mutated positions overlapping the codon
-    #     mut_over = muts[muts.pos.isin(codon_pos)]
-    #     if mut_over.empty:
-    #         continue
-    #     # positions where a deletion is detected
-    #     del_muts = mut_over[mut_over.mut == '-']
-    #     # if frameshift, nothing is saved
-    #     if len(del_muts) < 3:
-    #         # warnings.warn('frameshift del detected pos:%d-%d' % (i, i + 2))
-    #         logging.debug(
-    #             'frameshift deletion detected at pos:%d-%d', i, i + 2)
-    #     # if in frame, save with mean frequency
-    #     elif len(del_muts) == 3:
-    #         freq_here = sum(del_muts.freq) / 3
-    #         wt_codon = ''.join(del_muts.sort_values(by='pos').wt)
-    #         print('deletion detected: %s%d-' % (wt_codon, i))
-    #         d_here = {'wt': wt_codon, 'pos': i, 'mut': '---', 'freq': freq_here}
-    #         pm = pm.append(d_here, ignore_index=True)
-    #         # target is anyway appended to check the non indel mutations
-    #         targets.append((i, i + 2))
-    #         continue
-    #
-    #     # positions where an insertion is detected
-    #     ins_muts = mut_over[mut_over.wt == '-']
-    #     # if frameshift, nothing is saved
-    #     if len(ins_muts) < 3:
-    #         # warnings.warn('frameshift ins detected pos:%d-%d' % (i, i + 2))
-    #         logging.debug(
-    #             'frameshift insertion detected at pos:%d-%d', i, i + 2)
-    #     # if in frame, save with mean frequency
-    #     elif len(ins_muts) == 3:
-    #         print('insertion detected at pos:%s' % i)
-    #         freq_here = sum(ins_muts.freq) / 3
-    #         mut_codon = ''.join(ins_muts.sort_values(by='pos').mut)
-    #         d_here = {
-    #             'wt': '---', 'pos': i, 'mut': mut_codon, 'freq': freq_here}
-    #         pm = pm.append(d_here, ignore_index=True)
-    #         # target is anyway appended to check the non indel mutations
-    #         targets.append((i, i + 2))
-    #         continue
-    #
-    #     # this is reached when no in frame-indel is detected
-    #     if len(mut_over) > 1:
-    #         targets.append((i, i + 2))
-    #
-    # logging.info('%d targets found', len(targets))
-    # # count three base haplotypes with samtools
-    # for t in targets:
-    #     haps = {}
-    #     coverage = 0
-    #     cml = shlex.split(
-    #         'samtools view %s padded_consensus:%d-%d' % (bam_file, t[0], t[1]))
-    #     proc = subprocess.Popen(cml, stdout=subprocess.PIPE,
-    #                             universal_newlines=True)
-    #     with proc.stdout as handle:
-    #         for i, l in enumerate(handle):
-    #             lsp = l.split('\t')
-    #             pos = int(lsp[3])
-    #             cigar = lsp[5]
-    #             if 'D' in cigar or 'I' in cigar:
-    #                 continue
-    #             read = lsp[9]
-    #             reg = read[t[0] - pos:t[0] - pos + 3]
-    #             haps[reg] = haps.get(reg, 0) + 1
-    #             coverage += 1
-    #     logging.info('position:%d', t[0])
-    #     for k, v in sorted(haps.items(), key=itemgetter(1), reverse=True):
-    #         freq_here = float(v) / coverage
-    #         if freq_here > HAPLO_FREQ_THRESHOLD and len(k) > 1:
-    #             for disp in range(3):
-    #                 try:
-    #                     muts = muts[muts.pos != t[0] + disp]
-    #                 except ValueError:
-    #                     pass
-    #             d_here = {'wt': 'XYZ', 'pos': t[0], 'mut': k, 'freq': freq_here}
-    #             pm = pm.append(d_here, ignore_index=True)
-    #             logging.info('hap: %s freq:%f', k, freq_here)
-    #     logging.info('<------>')
-    # muts = muts.reset_index()
-    # pm = pm.reset_index()
-    # phased_muts = pd.concat([muts, pm], ignore_index=True)
-    # phased_muts.pos = phased_muts.pos.astype(int)
-    # phased_muts = phased_muts.sort_values(
-    #     by=['pos', 'freq'], ascending=[True, False])
-    # phased_muts = phased_muts.drop('index', axis=1)
-    # return phased_muts
-
 
 def compute_org_mutations(aa_sequence, org_found):
     """Compute mutation profile and mapping of a protein sequence.
@@ -371,12 +257,13 @@ def compute_org_mutations(aa_sequence, org_found):
     elif org_found == 'HCV':
         org_ref = h77_aa_seq
 
-    needle_align('asis:%s' % org_ref, 'asis:%s' % aa_sequence, 'parse.tmp', go=40., ge=4.)
-    alhr = alignfile2dict(['parse.tmp'])
+    needle_align('asis:%s' % org_ref, 'asis:%s' % aa_sequence, 'sample_vs_wt.fasta', go=40., ge=4.)
+    alhr = alignfile2dict(['sample_vs_wt.fasta'])
     alih = alhr['asis']['asis']
     alih.summary()
     if 3 * alih.mismatches > alih.ident:
         warnings.warn('Too many mismatches in parsing mutations')
+        logging.warning('In parsing mutations mismatches: %d ident:%d', alih.mismatches, alih.ident)
     #else:
     #    os.remove('parse.tmp')
     org_seq, in_seq = alih.seq_a.upper(), alih.seq_b.upper()
@@ -612,11 +499,11 @@ def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_fi
         aas_save.extend(aas)
         freqs_save.extend(freqs)
         nt_save.extend(nts)
-    all_muts_aa = pd.DataFrame({'freq': freqs_save, 'pos': a_pos_save, 'mut': aas_save, 'nts': nt_save})
-    # join with max_freq_muts_aa on in_pos (Sample consensus positions) to obtain positions on H77/consensus_B
-    all_muts_aa_full = pd.merge(max_freq_muts_aa, all_muts_aa, on='pos')
-    #all_muts_aa_full.drop(['mut_x', 'in_pos'], axis=1, inplace=True)
-    all_muts_aa_full.drop(['mut_x'], axis=1, inplace=True)
+    all_muts_aa = pd.DataFrame({'freq': freqs_save, 'in_pos': a_pos_save, 'mut': aas_save, 'nts': nt_save})
+    # join with max_freq_muts_aa on in_pos (sample consensus positions) to obtain positions on H77/consensus_B
+    all_muts_aa_full = pd.merge(max_freq_muts_aa, all_muts_aa, on='in_pos')
+    all_muts_aa_full.drop(['mut_x', 'in_pos'], axis=1, inplace=True)
+    # all_muts_aa_full.drop(['mut_x'], axis=1, inplace=True)
     all_muts_aa_full.rename(columns={'mut_y': 'mut'}, inplace=True)
     all_muts_aa_full.to_csv('intermediate.csv', index=False, float_format='%6.4f')
     all_muts_aa_full = all_muts_aa_full.drop(['nts'], axis=1)
