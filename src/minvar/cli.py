@@ -81,10 +81,9 @@ def main(args=None):
     from minvar import annotate
     annotate.main(vcf_file=called_file, ref_file=cns_file, bam_file=called_bam,
                   organism=org_found)
-    # annotate.main()
-    sys.exit()
+
     from minvar import reportdrm
-    reportdrm.main(org_found)
+    reportdrm.main(org=org_found, fastq=args.f)
 
     if not args.keep:
         for f in files_to_remove:

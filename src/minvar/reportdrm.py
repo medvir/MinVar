@@ -136,10 +136,52 @@ def parse_merged(mer_file):
     return mdf
 
 
-def main(org=None, mut_file='annotated_mutations.csv',
-         subtypes_file='subtype_evidence.csv'):
+def write_contact_file(sample_id='XYZ'):
+    """Write tex file with contact and sample information taken from ini file."""
+    import configparser
+    import shutil
+    config = configparser.ConfigParser()
+    config.read(os.path.expanduser('~/.minvar/contact.ini'))
+    try:
+        contact_dict = config['contact']
+    except KeyError:
+        contact_dict = {
+            'unit': 'TO BE DEFINED',
+            'phone': 'TO BE DEFINED',
+            'fax': 'TO BE DEFINED',
+            'email': 'TO BE DEFINED'
+        }
+    for key in contact_dict:
+        print(key, contact_dict[key])
+    oh = open('contact.tex', 'w')
+    oh.write(r'\fancyfoot[L]{%s}\n' % sample_id)
+
+    if 'logo' in contact_dict.keys():
+        shutil.copy(contact_dict['logo'], os.getwd())
+
+    r"""\fancyfoot[L]{John Smith \quad - \quad \href{mailto:john@smith.com}{{\small john@smith.com}}}
+
+    \begin{minipage}{0.5\textwidth}
+      \includegraphics[width=2in]{uzh_logo_e_pos}% Logo
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\textwidth}
+    \begin{tabular}{@{}r@{}}
+      \today \\[\normalbaselineskip]
+      Institute of Medical Virology \\
+      Telephone + 41 44 63 42653  \\
+      Fax + 41 44 63 44967 \\
+      Email \href{mailto:med-virology@virology.uzh.ch}{med-virology@virology.uzh.ch}
+    \end{tabular}
+    \end{minipage}"""
+
+
+
+
+def main(org=None, fastq=None, mut_file='annotated_mutations.csv', subtypes_file='subtype_evidence.csv'):
     """What the main does."""
     import subprocess
+    import shutil
 
     rh = open('report.md', 'w')
     write_header(rh, subtypes_file, org)
@@ -239,7 +281,9 @@ def main(org=None, mut_file='annotated_mutations.csv',
     rh.close()
     # convert to PDF with pandoc
     tmpl_file = os.path.abspath(os.path.join(db_dir, 'template.tex'))
-    pand_cml = 'pandoc --template={} report.md -o report.pdf'.format(tmpl_file)
+    shutil.copy(tmpl_file, os.getcwd())
+    write_contact_file()
+    pand_cml = 'pandoc --template=./template.tex report.md -o report.pdf'.format(tmpl_file)
     print(pand_cml, file=sys.stderr)
     subprocess.call(pand_cml, shell=True)
 
