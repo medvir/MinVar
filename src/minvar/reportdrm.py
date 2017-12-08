@@ -254,7 +254,7 @@ def main(org=None, fastq=None, version='unknown', mut_file='final.csv', subtypes
                     file=rh)
             print('\n', file=rh)
     elif org == 'HCV':
-        drms = pd.read_csv('annotated_mutations.csv')
+        drms = pd.read_csv('final.csv')
         logging.info('Shape of annotated_mutations is: %s', str(mutation_detected.shape))
 
         if drms.shape[0] == 0:
@@ -308,5 +308,5 @@ def main(org=None, fastq=None, version='unknown', mut_file='final.csv', subtypes
 
 if __name__ == '__main__':
     # args = parse_com_line()
-    main(org=sys.argv[1], fastq='xyz', version='not_found', mut_file='annotated_mutations.csv',
+    main(org=sys.argv[1], fastq='xyz', version='not_found', mut_file='final.csv',
          subtypes_file='subtype_evidence.csv')
