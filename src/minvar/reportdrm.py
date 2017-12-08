@@ -152,7 +152,7 @@ def write_contact_file(sample_id='unknown sample', version='unknown'):
             'email': 'TO BE DEFINED'
         }
     oh = open('contact.tex', 'w')
-    oh.write(r'\fancyfoot[L]{%s}' % sample_id + '\n')
+    oh.write(r'\fancyfoot[L]{sample: %s}' % sample_id + '\n')
     oh.write(r'\fancyfoot[C]{\texttt{built with MinVar version: %s}}' % version + '\n')
     oh.write(r'\begin{minipage}{0.5\textwidth}' + '\n')
     if 'logo' in contact_dict.keys():
