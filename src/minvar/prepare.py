@@ -128,7 +128,7 @@ def find_subtype(reads_file, sampled_reads=1000, recomb=False):
     loc_hits = pd.read_csv(loc_hit_file, names=cols, delimiter="\t")
     n_hits = loc_hits.shape[0]
     queries = len(set(loc_hits['qseqid']))
-    print('Queries: {}\tHits: {}'.format(queries, n_hits))
+    logging.info('blast queries: %d\tHits: %d', queries, n_hits)
     freqs = {k: 0.0 for k in set(loc_hits['sseqid'])}
     support = {'HIV': 0.0, 'HCV': 0.0}
     grouped = loc_hits.groupby(['qseqid'])

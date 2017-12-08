@@ -3,6 +3,7 @@
 import sys
 import os
 import csv
+import logging
 # from pkg_resources import resource_string
 # foo_config = resource_string(__name__, 'foo.conf')
 import pandas as pd
@@ -29,7 +30,7 @@ def parse_drm():
     for gene, drm_file_name in [('protease', 'masterComments_PI.txt'),
                                 ('RT', 'masterComments_RTI.txt'),
                                 ('integrase', 'masterComments_INI.txt')]:
-        drm_file = os.path.join(db_dir, drm_file_name)
+        drm_file = os.path.join(db_dir, 'HIV', drm_file_name)
         try:
             d1 = pd.read_table(drm_file, header=0,
                                names=['pos', 'mut', 'category', 'commented',
@@ -136,10 +137,9 @@ def parse_merged(mer_file):
     return mdf
 
 
-def write_contact_file(sample_id='XYZ'):
-    """Write tex file with contact and sample information taken from ini file."""
+def write_contact_file(sample_id='unknown sample', version='unknown'):
+    """Write tex file with contact information taken from ini file and sample_id in footer."""
     import configparser
-    import shutil
     config = configparser.ConfigParser()
     config.read(os.path.expanduser('~/.minvar/contact.ini'))
     try:
@@ -151,13 +151,24 @@ def write_contact_file(sample_id='XYZ'):
             'fax': 'TO BE DEFINED',
             'email': 'TO BE DEFINED'
         }
-    for key in contact_dict:
-        print(key, contact_dict[key])
     oh = open('contact.tex', 'w')
-    oh.write(r'\fancyfoot[L]{%s}\n' % sample_id)
-
+    oh.write(r'\fancyfoot[L]{%s}' % sample_id + '\n')
+    oh.write(r'\fancyfoot[C]{\texttt{built with MinVar version: %s}}' % version + '\n')
+    oh.write(r'\begin{minipage}{0.5\textwidth}' + '\n')
     if 'logo' in contact_dict.keys():
-        shutil.copy(contact_dict['logo'], os.getwd())
+        logo_file = os.path.expanduser(os.path.join('~/.minvar/', contact_dict['logo']))
+        oh.write(r'\includegraphics[width=2in]{%s}' % logo_file + '\n')
+    oh.write(r'\end{minipage}' + '\n')
+    oh.write(r'\hfill' + '\n')
+    oh.write(r'\begin{minipage}{0.45\textwidth}' + '\n')
+    oh.write(r'\begin{tabular}{@{}r@{}}' + '\n')
+    oh.write(r'\today \\[\normalbaselineskip]' + '\n')
+    oh.write(r'%s\\' % contact_dict['unit'] + '\n')
+    oh.write(r'phone: %s\\' % contact_dict['phone'] + '\n')
+    oh.write(r'fax: %s\\' % contact_dict['fax'] + '\n')
+    oh.write(r'email: \href{mailto:%s}{%s}\\' % (contact_dict['email'], contact_dict['email']) + '\n')
+    oh.write(r'\end{tabular}' + '\n')
+    oh.write(r'\end{minipage}' + '\n')
 
     r"""\fancyfoot[L]{John Smith \quad - \quad \href{mailto:john@smith.com}{{\small john@smith.com}}}
 
@@ -176,33 +187,31 @@ def write_contact_file(sample_id='XYZ'):
     \end{minipage}"""
 
 
-
-
-def main(org=None, fastq=None, mut_file='annotated_mutations.csv', subtypes_file='subtype_evidence.csv'):
+def main(org=None, fastq=None, version='unknown', mut_file='final.csv', subtypes_file='subtype_evidence.csv'):
     """What the main does."""
     import subprocess
     import shutil
+    import re
 
     rh = open('report.md', 'w')
     write_header(rh, subtypes_file, org)
 
-    print('Reading mutations from %s' % mut_file, file=sys.stderr)
+    logging.info('Reading mutations from %s', mut_file)
     mutation_detected = pd.read_csv(mut_file)
-    print('Shape is: ', mutation_detected.shape)
+    logging.info('shape: %s', mutation_detected.shape)
 
     if org == 'HIV':
-        print('Parsing DRM from database', file=sys.stderr)
         resistance_mutations = parse_drm()
-        print('Shape is: ', resistance_mutations.shape)
+        logging.info('Parsed DRM from database, shape: %s', str(resistance_mutations.shape))
 
         mpd = pd.merge(mutation_detected, resistance_mutations, how='left',
                        on=['gene', 'pos'])
         mpd.to_csv(path_or_buf='merged_muts_drm_annotated.csv')
-        print('Shape of raw merged is: ', mpd.shape)
+        logging.info('Shape of raw merged is: %s', str(mpd.shape))
 
         # too complicated with panda, do it by hand
         drms = parse_merged('merged_muts_drm_annotated.csv')
-        print('Shape of merged is: ', drms.shape)
+        logging.info('Shape of elaborated merged is: %s', str(drms.shape))
         # os.remove('merged_muts.csv')
 
         drms.drop(['', 'commented', 'mut_y'], axis=1, inplace=True)
@@ -217,7 +226,7 @@ def main(org=None, fastq=None, mut_file='annotated_mutations.csv', subtypes_file
         for gene in ['protease', 'RT', 'integrase']:
             gene_muts = drms[drms.gene == gene]
             if gene_muts.shape[0] == 0:
-                print('No mutations on ', gene, file=sys.stderr)
+                logging.info('No mutations on %s', gene)
                 print('No mutations on %s' % gene, file=rh)
                 print('-' * (len(gene) + 16), file=rh)
                 print(file=rh)
@@ -246,7 +255,7 @@ def main(org=None, fastq=None, mut_file='annotated_mutations.csv', subtypes_file
             print('\n', file=rh)
     elif org == 'HCV':
         drms = pd.read_csv('annotated_mutations.csv')
-        print('Shape of annotated_mutations is: ', mutation_detected.shape)
+        logging.info('Shape of annotated_mutations is: %s', str(mutation_detected.shape))
 
         if drms.shape[0] == 0:
             print('No mutations found', file=rh)
@@ -256,7 +265,7 @@ def main(org=None, fastq=None, mut_file='annotated_mutations.csv', subtypes_file
         for gene in ['unknown']:
             gene_muts = drms[drms.gene == gene]
             if gene_muts.shape[0] == 0:
-                print('No mutations on ', gene, file=sys.stderr)
+                logging.info('No mutations on %s', gene)
                 print('No mutations on %s' % gene, file=rh)
                 print('-' * (len(gene) + 16), file=rh)
                 print(file=rh)
@@ -277,18 +286,27 @@ def main(org=None, fastq=None, mut_file='annotated_mutations.csv', subtypes_file
                     file=rh)
                 del index
             print('\n', file=rh)
-
     rh.close()
-    # convert to PDF with pandoc
+
+    # copy template to current directory
     tmpl_file = os.path.abspath(os.path.join(db_dir, 'template.tex'))
     shutil.copy(tmpl_file, os.getcwd())
-    write_contact_file()
-    pand_cml = 'pandoc --template=./template.tex report.md -o report.pdf'.format(tmpl_file)
-    print(pand_cml, file=sys.stderr)
+    # write contact.tex to be included in template
+    fastq_base = os.path.basename(fastq)
+    try:
+        sample_id = re.search(r'(.*)_S\d*', fastq_base).group(1)
+    except AttributeError:
+        sample_id = 'unknown'
+    write_contact_file(sample_id=sample_id, version=version)
+    # convert to PDF with pandoc
+    pand_cml = 'pandoc --template=./template.tex report.md -o report.pdf'
+    logging.debug(pand_cml)
     subprocess.call(pand_cml, shell=True)
+    os.remove('./template.tex')
+    os.remove('contact.tex')
 
 
 if __name__ == '__main__':
     # args = parse_com_line()
-    main(org=sys.argv[1], mut_file='annotated_mutations.csv',
+    main(org=sys.argv[1], fastq='xyz', version='not_found', mut_file='annotated_mutations.csv',
          subtypes_file='subtype_evidence.csv')

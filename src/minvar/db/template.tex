@@ -6,17 +6,27 @@
   margin=0.5in,% Equal margin of 0.5in from all four sides
   includefoot% Include only the footer in the margin calculations, since you don't have a header
 }
-
+% set default font to sans serif
+\renewcommand\familydefault{\sfdefault}
 % Header/footer
 \usepackage{fancyhdr,lastpage,longtable,booktabs}
+
+% turn off section numbering
+\makeatletter
+\renewcommand{\@seccntformat}[1]{}
+\makeatother
+
+% pandoc needs definition for tightlist
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
 % \setlength{\headheight}{25.2pt}
+
 \pagestyle{fancy}% Page style will be fancy
 \fancyhf{}% Clear headers and footers
 \renewcommand{\headrulewidth}{0pt}% No header rule
 \renewcommand{\footrulewidth}{0pt}% No footer rule (default)
-
 \fancyfoot[R]{\thepage\ of \pageref{LastPage}}
-\fancyfoot[C]{\texttt{built with MinVar}}
 
 \usepackage{hyperref,graphicx}
 

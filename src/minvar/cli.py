@@ -18,8 +18,8 @@ import argparse
 import os
 import sys
 
-from pkg_resources import (DistributionNotFound, get_distribution,
-                           resource_filename)
+from pkg_resources import (DistributionNotFound, get_distribution)
+# resource_filename)
 
 try:
     __version__ = get_distribution('minvar').version
@@ -83,7 +83,7 @@ def main(args=None):
                   organism=org_found)
 
     from minvar import reportdrm
-    reportdrm.main(org=org_found, fastq=args.f)
+    reportdrm.main(org=org_found, fastq=args.f, version=__version__)
 
     if not args.keep:
         for f in files_to_remove:
@@ -92,10 +92,10 @@ def main(args=None):
             except FileNotFoundError:
                 pass
 
-    if org_found == 'HIV':
-        from minvar import stats
-        bed_file = resource_filename(__name__, 'db/HIV/consensus_B.bed')
-        stats.coverage_stats_per_base(prepared_bam, bed_file)
-        cum_cov = stats.gene_coverage(prepared_bam, bed_file)
-        for k, v in cum_cov.items():
-            print(k, v)
+    # if org_found == 'HIV':
+    #     from minvar import stats
+    #     bed_file = resource_filename(__name__, 'db/HIV/consensus_B.bed')
+    #     stats.coverage_stats_per_base(called_bam, bed_file)
+    #     cum_cov = stats.gene_coverage(called_bam, bed_file)
+    #     for k, v in cum_cov.items():
+    #         print(k, v)

@@ -515,6 +515,7 @@ def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_fi
     real_muts = real_muts.sort_values(by=['pos', 'freq'], ascending=[True, False])
     real_muts = real_muts.drop(['organism', 'pos'], axis=1)
     real_muts = real_muts[['gene', 'wt', 'gene_pos', 'mut', 'freq']]
+    real_muts.rename(columns={'gene_pos': 'pos'}, inplace=True)
     real_muts.to_csv('final.csv', index=False, float_format='%6.4f')
 
 
