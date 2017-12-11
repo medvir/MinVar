@@ -25,7 +25,7 @@ db_dir = os.path.abspath(os.path.join(dn_dir, 'db'))
 
 
 def parse_drm():
-    """Parse drug resistance mutations listed in files db/*Variation.txt."""
+    """Parse drug resistance mutations listed in files db/HIV/masterComments*.txt."""
     df_list = []
     for gene, drm_file_name in [('protease', 'masterComments_PI.txt'),
                                 ('RT', 'masterComments_RTI.txt'),
@@ -35,7 +35,7 @@ def parse_drm():
             d1 = pd.read_table(drm_file, header=0,
                                names=['pos', 'mut', 'category', 'commented',
                                       'comment'])
-        except:  # integrase does not have commented column
+        except pd.io.common.CParserError:  # integrase does not have commented column
             d1 = pd.read_table(drm_file, header=0,
                                names=['pos', 'mut', 'category', 'comment'])
         gs = pd.Series([gene] * len(d1))
@@ -44,29 +44,17 @@ def parse_drm():
     df = pd.concat(df_list)
     return df
 
-# def parse_region(hap1):
-#     """Whether the region comes from protease, RT or integrase"""
-#
-#     import Alignment
-#     matched_res = []
-#
-#     for gs in [prot, RT, integrase]:
-#         alout = '%s.tmp' % gs.id
-#         Alignment.needle_align('asis:%s' % hap1, 'asis:%s' % str(gs.seq),
-#                                alout)
-#         ald = Alignment.alignfile2dict([alout])
-#         os.remove(alout)
-#         ali = ald['asis']['asis']
-#         ali.summary()
-#         ratio1 = float(ali.ident) / (ali.ident + ali.mismatches)
-#         if ratio1 > 0.75:
-#             matched_res.append(gs.id)
-#
-#     return matched_res
+
+def parse_ras():
+    """Parse position of RAS listed in file db/HCV/all_mutations_position.csv."""
+    ras_file = os.path.join(db_dir, 'HCV/all_mutations_position.csv')
+    ras_positions = pd.read_csv(ras_file)
+    ras_positions['CATEGORY'] = 'RAS'
+    return ras_positions
 
 
-def write_header(handle, subtype_file=None, org_found=None):
-    """Write header to a file in markdown format."""
+def write_subtype_info(handle, subtype_file=None):
+    """Write information on subtyping."""
     from operator import itemgetter
     md_header = 'Drug resistance mutations detected by NGS sequencing'
     md_header += '\n' + '=' * len(md_header) + '\n\n'
@@ -85,31 +73,41 @@ def write_header(handle, subtype_file=None, org_found=None):
         for k, v in sorted(save_freq.items(), key=itemgetter(1),
                            reverse=True):
             md_header += '|{: ^17}|{: ^13}|\n'.format(k, v)
-    if org_found == 'HIV':
-        md_header += """
+    print(md_header, file=handle)
+
+
+def write_header_HIV(handle, drms=None):
+    """Write header to a file in markdown format."""
+
+    md_header = """
 
 Parsing mutations
 -----------------
 
-The list of mutations was downloaded from HIVdb and includes:
+The list of annotated mutations was downloaded from HIVdb and includes:
 
-- xyz positions on protease
-- zyx positions on RT
-- abc positions on integrase.
 """
+    for gene in ['protease', 'RT', 'integrase']:
+        positions = set(drms[drms.gene == gene].pos.tolist())
+        md_header += '- %d positions on %s\n' % (len(positions), gene)
     print(md_header, file=handle)
 
 
-def parse_com_line():
-    """argparse, since optparse deprecated starting from python 2.7."""
-    import argparse
+def write_header_HCV(handle, drms=None):
+    """Write header to a file in markdown format."""
 
-    parser = argparse.ArgumentParser(description='parse DRM mutations')
-    parser.add_argument('-a', '--haplotypes', dest='haps',
-                        help='file with amino acid haplotypes')
+    md_header = """
 
-    args = parser.parse_args()
-    return args
+Parsing mutations
+-----------------
+
+The list of known RAS includes:
+
+"""
+    for gene in ['NS3', 'NS5A', 'NS5B']:
+        positions = set(drms[drms.gene == gene].pos.tolist())
+        md_header += '- %d positions on %s\n' % (len(positions), gene)
+    print(md_header, file=handle)
 
 
 def aa_unpack(mut_string):
@@ -187,28 +185,32 @@ def write_contact_file(sample_id='unknown sample', version='unknown'):
     \end{minipage}"""
 
 
-def main(org=None, fastq=None, version='unknown', mut_file='final.csv', subtypes_file='subtype_evidence.csv'):
+def main(org=None, fastq=None, version='unknown', mut_file='final.csv', subtype_file='subtype_evidence.csv'):
     """What the main does."""
     import subprocess
     import shutil
     import re
 
     rh = open('report.md', 'w')
-    write_header(rh, subtypes_file, org)
+    write_subtype_info(rh, subtype_file)
+    if org == 'HIV':
+        resistance_mutations = parse_drm()
+        write_header_HIV(rh, resistance_mutations)
+    elif org == 'HCV':
+        resistance_mutations = parse_ras()
+        write_header_HCV(rh, resistance_mutations)
+
 
     logging.info('Reading mutations from %s', mut_file)
     mutation_detected = pd.read_csv(mut_file)
     logging.info('shape: %s', mutation_detected.shape)
+    logging.info('Parsed DRM from database, shape: %s', str(resistance_mutations.shape))
+    mpd = pd.merge(mutation_detected, resistance_mutations, how='left',
+                   on=['gene', 'pos'])
+    mpd.to_csv(path_or_buf='merged_muts_drm_annotated.csv', index=False)
+    logging.info('Shape of raw merged is: %s', str(mpd.shape))
 
     if org == 'HIV':
-        resistance_mutations = parse_drm()
-        logging.info('Parsed DRM from database, shape: %s', str(resistance_mutations.shape))
-
-        mpd = pd.merge(mutation_detected, resistance_mutations, how='left',
-                       on=['gene', 'pos'])
-        mpd.to_csv(path_or_buf='merged_muts_drm_annotated.csv')
-        logging.info('Shape of raw merged is: %s', str(mpd.shape))
-
         # too complicated with panda, do it by hand
         drms = parse_merged('merged_muts_drm_annotated.csv')
         logging.info('Shape of elaborated merged is: %s', str(drms.shape))
@@ -254,35 +256,35 @@ def main(org=None, fastq=None, version='unknown', mut_file='final.csv', subtypes
                     file=rh)
             print('\n', file=rh)
     elif org == 'HCV':
-        drms = pd.read_csv('final.csv')
-        logging.info('Shape of annotated_mutations is: %s', str(mutation_detected.shape))
+        drms = pd.read_csv('merged_muts_drm_annotated.csv')
+        drms = drms[drms['CATEGORY'] == 'RAS']
+        # logging.info('Shape of annotated_mutations is: %s', str(mutation_detected.shape))
 
         if drms.shape[0] == 0:
             print('No mutations found', file=rh)
             print('-' * 26, file=rh)
             print('\n', file=rh)
 
-        for gene in ['unknown']:
+        for gene in ['NS3', 'NS5A', 'NS5B']:
             gene_muts = drms[drms.gene == gene]
             if gene_muts.shape[0] == 0:
-                logging.info('No mutations on %s', gene)
-                print('No mutations on %s' % gene, file=rh)
+                logging.info('No RAS mutations on %s', gene)
+                print('No RAS mutations on %s' % gene, file=rh)
                 print('-' * (len(gene) + 16), file=rh)
                 print(file=rh)
                 continue
 
             print('%s' % gene, file=rh)
             print('-'*len(gene), file=rh)
-            h1 = '| position | mutation | frequency [%] |'
+            h1 = '| position | mutation | frequency [%] | type'
             print(h1, file=rh)
-            h2 = '|:{:-^8}:|:{:-^8}:|:{:-^13}:|'
-            print(h2.format('', '', ''), file=rh)
+            h2 = '|:{:-^8}:|:{:-^8}:|:{:-^13}:|:{:-^10}:|'
+            print(h2.format('', '', '', ''), file=rh)
             for index, row in gene_muts.iterrows():
                 int_freq = int(round(100 * row['freq'], 0))
+                category = row['CATEGORY']
                 print(
-                    '|{: ^10}|{: ^10}|{: ^15}|'.format(int(row['pos']),
-                                                       row['mut'],
-                                                       int_freq),
+                    '|{: ^10}|{: ^10}|{: ^15}|{: ^12}'.format(int(row['pos']), row['mut'], int_freq, category),
                     file=rh)
                 del index
             print('\n', file=rh)
@@ -307,6 +309,5 @@ def main(org=None, fastq=None, version='unknown', mut_file='final.csv', subtypes
 
 
 if __name__ == '__main__':
-    # args = parse_com_line()
-    main(org=sys.argv[1], fastq='xyz', version='not_found', mut_file='final.csv',
-         subtypes_file='subtype_evidence.csv')
+    main(org=sys.argv[1], fastq='xyz', version='unknown', mut_file='final.csv',
+         subtype_file='subtype_evidence.csv')

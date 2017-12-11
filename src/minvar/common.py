@@ -42,13 +42,13 @@ for i in range(810, 1027):
 for i in range(1027, 1658):
     h77_map[i] = 'NS3', i - 1026
 for i in range(1658, 1712):
-    h77_map[i] = 'NS4a', i - 1657
+    h77_map[i] = 'NS4A', i - 1657
 for i in range(1712, 1973):
-    h77_map[i] = 'NS4b', i - 1711
+    h77_map[i] = 'NS4B', i - 1711
 for i in range(1973, 2421):
-    h77_map[i] = 'NS5a', i - 1972
+    h77_map[i] = 'NS5A', i - 1972
 for i in range(2421, 3012):
-    h77_map[i] = 'NS5b', i - 2420
+    h77_map[i] = 'NS5B', i - 2420
 
 # dictionary with 1-based coordinates of genes on consensus_B
 consensus_B_map = {}
