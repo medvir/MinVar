@@ -4,8 +4,8 @@ import sys
 import os
 import csv
 import logging
-# from pkg_resources import resource_string
-# foo_config = resource_string(__name__, 'foo.conf')
+from pkg_resources import resource_filename
+
 import pandas as pd
 
 # from common import acc_numbers, hcv_map
@@ -14,8 +14,10 @@ import pandas as pd
 aa_set = set('GPAVLIMCFYWHKRQNEDST')
 
 # amminoacid sequences from files in db directory
-dn_dir = os.path.dirname(__file__)
-db_dir = os.path.abspath(os.path.join(dn_dir, 'db'))
+#dn_dir = os.path.dirname(__file__)
+#db_dir = os.path.abspath(os.path.join(dn_dir, 'db'))
+#HCV_references = resource_filename(__name__, 'db/HCV/subtype_references.fasta')
+
 
 # prot = \
 #     list(SeqIO.parse(os.path.join(db_dir, 'protease.faa'), 'fasta'))[0]
@@ -27,10 +29,14 @@ db_dir = os.path.abspath(os.path.join(dn_dir, 'db'))
 def parse_drm():
     """Parse drug resistance mutations listed in files db/HIV/masterComments*.txt."""
     df_list = []
-    for gene, drm_file_name in [('protease', 'masterComments_PI.txt'),
-                                ('RT', 'masterComments_RTI.txt'),
-                                ('integrase', 'masterComments_INI.txt')]:
-        drm_file = os.path.join(db_dir, 'HIV', drm_file_name)
+    genes = ['protease', 'RT', 'integrase']
+    HIVdb_comment_files = [resource_filename(__name__, 'db/HIV/masterComments_%s.txt' % p)
+                           for p in ('PI', 'RTI', 'INI')]
+    for gene, drm_file in zip(genes, HIVdb_comment_files):
+        # [('protease', 'masterComments_PI.txt'),
+        #                        ('RT', 'masterComments_RTI.txt'),
+        #                        ('integrase', 'masterComments_INI.txt')]:
+        #drm_file = os.path.join(db_dir, 'HIV', drm_file_name)
         try:
             d1 = pd.read_table(drm_file, header=0,
                                names=['pos', 'mut', 'category', 'commented',
@@ -47,7 +53,7 @@ def parse_drm():
 
 def parse_ras():
     """Parse position of RAS listed in file db/HCV/all_mutations_position.csv."""
-    ras_file = os.path.join(db_dir, 'HCV/all_mutations_position.csv')
+    ras_file = resource_filename(__name__, 'db/HCV/all_mutations_position.csv')
     ras_positions = pd.read_csv(ras_file)
     ras_positions['CATEGORY'] = 'RAS'
     return ras_positions
@@ -291,7 +297,7 @@ def main(org=None, fastq=None, version='unknown', mut_file='final.csv', subtype_
     rh.close()
 
     # copy template to current directory
-    tmpl_file = os.path.abspath(os.path.join(db_dir, 'template.tex'))
+    tmpl_file = resource_filename(__name__, 'db/template.tex')
     shutil.copy(tmpl_file, os.getcwd())
     # write contact.tex to be included in template
     fastq_base = os.path.basename(fastq)
