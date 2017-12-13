@@ -15,7 +15,7 @@ setup(
     packages=find_packages('src'),  # include all packages under src
     package_dir={'': 'src'},  # tell setuptools packages are under src
     # scripts=['bin/minvar', 'src/scripts/blast2sam.py'],
-    package_data={'minvar': ['db/HIV/*', 'db/HCV/*']},
+    package_data={'minvar': ['db/HIV/*', 'db/HCV/*', 'db/template.tex']},
     entry_points={
         'console_scripts': ['minvar = minvar.cli:main',
                             'blast2sam = scripts.blast2sam:main'],
