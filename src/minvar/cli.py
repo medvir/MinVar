@@ -18,11 +18,12 @@ import argparse
 import os
 import sys
 
-from pkg_resources import (DistributionNotFound, get_distribution)
+from pkg_resources import (get_distribution, DistributionNotFound, resource_exists)
 # resource_filename)
 
 try:
     __version__ = get_distribution('minvar').version
+    HCV_references = resource_exists(__name__, 'db/HCV/subtype_references.fasta')
 
 except DistributionNotFound:
     # package is not installed

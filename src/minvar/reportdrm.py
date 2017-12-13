@@ -216,7 +216,7 @@ def main(org=None, fastq=None, version='unknown', mut_file='final.csv', subtype_
         logging.info('Shape of elaborated merged is: %s', str(drms.shape))
         # os.remove('merged_muts.csv')
 
-        drms.drop(['', 'commented', 'mut_y'], axis=1, inplace=True)
+        drms.drop(['commented', 'mut_y'], axis=1, inplace=True)
         drms.rename(columns={'mut_x': 'mut'}, inplace=True)
 
         cols = ['gene', 'pos', 'mut', 'freq', 'category']

@@ -4,9 +4,8 @@ from setuptools import setup, find_packages
 
 setup(
     use_scm_version=True,
-    setup_requires=['setuptools_scm', 'setuptools_scm_git_archive',
-                    'isort', 'pytest-runner'],
-    install_requires=['setuptools_scm', 'biopython'],
+    setup_requires=['setuptools_scm', 'setuptools_scm_git_archive', 'pytest-runner'],
+    install_requires=['setuptools_scm'],
     tests_require=['pytest', 'flake8'],
     name='MinVar',
     description='Minority variants in HIV',
@@ -16,7 +15,7 @@ setup(
     packages=find_packages('src'),  # include all packages under src
     package_dir={'': 'src'},  # tell setuptools packages are under src
     # scripts=['bin/minvar', 'src/scripts/blast2sam.py'],
-    package_data={'minvar': ['src/minvar/db/*']},
+    package_data={'minvar': ['db/HIV/*', 'db/HCV/*']},
     entry_points={
         'console_scripts': ['minvar = minvar.cli:main',
                             'blast2sam = scripts.blast2sam:main'],
