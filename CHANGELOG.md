@@ -4,12 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [v2.0a] - 2017-11-29
+## [Unreleased]
+
+## [v2.0] - 2017-12-13
+
 ### Added
 - Support for HCV.
+- Report in pdf now styled as article with information on footer of each page.
+- Contact information and a logo can be specified with a INI file in `~/.minvar`
 - `minvar` can be called as a module or as command line program.
 
 ### Changed
+- Improved generation of sample consensus.
 - Widespread use of `shlex`, _i.e._ processes are not called via shell.
 - Reorganization of the package structure:
   - code is now in `src/minvar`;
