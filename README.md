@@ -13,7 +13,7 @@ in HIV-1 and HCV populations using deep sequencing data.
 
     [user@host ~]$ minvar -f sample_file.fastq
     ... a few minutes later ...
-    [user@host ~]$ column -t -s ',' annotated_DRM.csv
+    [user@host ~]$ column -t -s ',' merged_muts_drm_annotated.csv
     gene      pos  mut  freq    category
     ...
     RT        238  T    1.0     NNRTI
@@ -43,7 +43,8 @@ in HIV-1 and HCV populations using deep sequencing data.
   does not ask the standard user to set any parameter at run time. Nevertheless,
   the experienced user/developer can easily change some of its settings in the
   source code.
-- It has been tested on both Illumina MiSeq and Roche/454 sequencing reads.
+- It has been tested with HIV-1 on both Illumina MiSeq and Roche/454 sequencing
+  reads. HCV has been tested on MiSeq only.
 - It uses state-of-the-art third tools to filter, recalibrate, and align reads
   and to call variants.
 - Finally, single nucleotide variants are phased at codon level and
@@ -52,6 +53,22 @@ in HIV-1 and HCV populations using deep sequencing data.
   [Stanford HIV Drug Resistance Database (HIVDB)](https://hivdb.stanford.edu).
 - The annotated mutations are saved in a csv file (see example above) and also
   included in a report in markdown format that is finally converted to PDF.
+- The PDF report can be customized by adding contact information specified in the
+  file `~/.minvar/contac.ini` with the following syntax (only change what comes
+  after the `=` sign)
+
+```
+[contact]
+unit = name_of_your_unit_here
+phone = phone_number
+fax = fax_number
+email = your_unit@your_company
+logo = filename_without_extension
+```
+
+The logo file in pdf format must be present in the same directory. In other words,
+if we want to use the file `~/.minvar/company_logo_bw.pdf`, then in the INI file we
+will write `logo = company_logo_bw`.
 
 ## Documentation
 
@@ -72,11 +89,8 @@ drug resistance genotyping by deep sequencing _Journal of virological methods_
 - `subtype_evidence.csv` percent of reads best aligned to each subtype (or
   genotype),
 - `subtype_ref.fasta` references of the subtype identified,
-- `denovo_consensus.fasta` sample consensus built by iterative alignment of
-  reads to organism/subtype reference,
-- `cns_final.fasta`: in case the _denovo_ consensus is longer or shorter than
-  the reference for that organism/subtype, cut it to the correct length
-  (expected in the following steps),
+- `cns_final.fasta`: sample consensus created by iteratively aligning reads and
+  writing variants into the sequence,
 
 ### Created by `callvar.py`
 
@@ -87,17 +101,15 @@ drug resistance genotyping by deep sequencing _Journal of virological methods_
 
 ### Created by `annotate.py`
 
-- `cns_mutations_nt.csv` table of mutations observed on sample consensus with
-  respect to organism/subtype reference (column `wt`) at nucleotide level,
-- `vcf_mutations_nt.csv` table of mutations in vcf file with respect to
-  sample consensus (columnt `wt`) at nucleotide level,
-- `merged_mutations_nt.csv` obtained by combining the previous two files, the
-  result is a table of mutations
-- `annotated_mutations.csv` mutations at amminoacid level with indication of
+- `merged_mutations_nt.csv` a list of all variants observed at single positions,
+- `max_freq_muts_aa.csv` the amminoacid found at maximum frequency at each codon,
+- `final.csv` mutations at amminoacid level with indication of
   the gene, the position on the gene, wild type and frequency
 
 ### Created by `reportdrm.py`
 
+- `merged_muts_drm_annotated.csv` is the join of `final.csv` with the annotation
+  of DRM/RAS,
 - `report.md` and `report.pdf` final report with subtye estimate based on
   alignment of reads to different references and tables with mutations. The
   pdf report is created from the template `minvar/db/template.tex`.
