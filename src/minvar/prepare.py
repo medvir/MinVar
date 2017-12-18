@@ -14,7 +14,7 @@ from Bio.SeqRecord import SeqRecord
 from pkg_resources import resource_filename
 
 from .common import hcv_map, org_dict
-from .stats import (genome_coverage, genome_longest_covered)
+from .stats import (genome_coverage, start_stop_coverage)
 
 dn_dir = os.path.dirname(os.path.abspath(__file__))
 HCV_references = resource_filename(__name__, 'db/HCV/subtype_references.fasta')
@@ -354,7 +354,7 @@ def iterate_consensus(reads_file, ref_file):
     # consensus from first round is saved into cns_1.fasta
     cns_file_1, new_cov = make_consensus(
         ref_file, reads_file, iteration,
-        sampled_reads=5000, mapper='blast')
+        sampled_reads=10000, mapper='blast')
     try:
         os.rename('calls.vcf.gz', 'calls_%d.vcf.gz' % iteration)
     except FileNotFoundError:
@@ -455,9 +455,9 @@ def main(read_file=None, max_n_reads=200000):
     cns_file = iterate_consensus(filtered_file, 'subtype_ref.fasta')
     logging.info('Consensus in file %s', cns_file)
     # extract the longest region covered by at least 100 reads and save that
-    longest_covered = genome_longest_covered('refcon_sorted.bam')
+    cov_start, cov_stop = start_stop_coverage('refcon_sorted.bam')
     all_ref = list(SeqIO.parse(cns_file, 'fasta'))[0]
-    covered_dna = str(all_ref.seq[longest_covered['start']:longest_covered['stop']])
+    covered_dna = str(all_ref.seq[cov_start - 1:cov_stop - 1])
     all_ref.seq = Seq(disambiguate(covered_dna))
     logging.info('writing an unambiguous sequence of length %d to cns_final.fasta', len(all_ref.seq))
     SeqIO.write(all_ref, 'cns_final.fasta', 'fasta')

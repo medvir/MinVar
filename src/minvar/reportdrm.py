@@ -14,9 +14,9 @@ import pandas as pd
 aa_set = set('GPAVLIMCFYWHKRQNEDST')
 
 # amminoacid sequences from files in db directory
-#dn_dir = os.path.dirname(__file__)
-#db_dir = os.path.abspath(os.path.join(dn_dir, 'db'))
-#HCV_references = resource_filename(__name__, 'db/HCV/subtype_references.fasta')
+# dn_dir = os.path.dirname(__file__)
+# db_dir = os.path.abspath(os.path.join(dn_dir, 'db'))
+# HCV_references = resource_filename(__name__, 'db/HCV/subtype_references.fasta')
 
 
 # prot = \
@@ -36,7 +36,7 @@ def parse_drm():
         # [('protease', 'masterComments_PI.txt'),
         #                        ('RT', 'masterComments_RTI.txt'),
         #                        ('integrase', 'masterComments_INI.txt')]:
-        #drm_file = os.path.join(db_dir, 'HIV', drm_file_name)
+        # drm_file = os.path.join(db_dir, 'HIV', drm_file_name)
         try:
             d1 = pd.read_table(drm_file, header=0,
                                names=['pos', 'mut', 'category', 'commented',
@@ -205,7 +205,6 @@ def main(org=None, fastq=None, version='unknown', mut_file='final.csv', subtype_
     elif org == 'HCV':
         resistance_mutations = parse_ras()
         write_header_HCV(rh, resistance_mutations)
-
 
     logging.info('Reading mutations from %s', mut_file)
     mutation_detected = pd.read_csv(mut_file)

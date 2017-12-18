@@ -58,11 +58,11 @@ def genome_coverage(bam_file, threshold=5):
 
 
 def genome_longest_covered(bam_file, threshold=20):
-    """Invoke bedtools to find the longest/most covered contiguous region."""
+    """Invoke bedtools to find the longest covered almost contiguous regions."""
     import os
     import pandas as pd
     # The command used is:
-    # bedtools genomecov -ibam refcon_sorted.bam -bg | awk '$4 > threshold' | bedtools cluster -i -
+    # bedtools genomecov -ibam refcon_sorted.bam -bg | awk '$4 > threshold' | bedtools cluster -d 10 -i -
     # giving a file with lines whose meaning is
     # chr          start    stop  coverage   cluster
     # e.g.
@@ -81,20 +81,34 @@ def genome_longest_covered(bam_file, threshold=20):
                 writing.write(l)
 
     # cluster adiacent entries in covfile
-    cml = shlex.split('bedtools cluster -i covfile.txt')
+    cml = shlex.split('bedtools cluster -d 10 -i covfile.txt')
     with open('clusters.txt', 'w+') as oh:
         subprocess.call(cml, stdout=oh, universal_newlines=True)
     # read them in a dataframe, compute the lenght of each region and return the longest
     df = pd.read_table('clusters.txt', header=None, names=['chr', 'start', 'stop', 'coverage', 'cluster'])
     clusters = df.groupby('cluster').agg({'start': 'min', 'stop': 'max'}).reset_index()
     clusters['length'] = clusters['stop'] - clusters['start']
+    clusters = clusters.sort_values(by=['length'])
+#    start, stop = min(clusters['start']), max(clusters['stop'])
+#    print(start, stop)
     best = clusters.loc[clusters['length'].idxmax()]
     os.remove('covfile.txt')
     os.remove('clusters.txt')
     return best.to_dict()
 
 
+def start_stop_coverage(bam_file, threshold=20):
+    """Find the first and last position covered by at least <threshold> reads with samtools depth."""
+    cml = shlex.split('samtools depth %s' % bam_file)
+    proc = subprocess.Popen(cml, stdout=subprocess.PIPE, universal_newlines=True)
+    with proc.stdout as reading:
+        positions = [int(l.split()[1]) for l in reading if int(l.split()[2]) > threshold]
+    start, stop = min(positions), max(positions)
+    return start, stop
+
+
 if __name__ == "__main__" and __package__ is None:
     # coverage_stats_per_base(sys.argv[1], sys.argv[2])
-    glg = genome_longest_covered(sys.argv[1], 400)
+    # glg = genome_longest_covered(sys.argv[1], 10)
+    glg = start_stop_coverage(sys.argv[1])
     print(glg)
