@@ -208,9 +208,9 @@ def write_run_info(handle):
 Run information
 ---------------
 
-Mutations at single nucleotide positions were called with a %f%% frequency threshold and a minimum depth of %d reads.
+Mutations at single nucleotide positions were called with a %4.1f%% frequency threshold and a minimum depth of %d reads.
 
-""" % (MIN_FRACTION, RAW_DEPTH_THRESHOLD)
+""" % (100 * MIN_FRACTION, RAW_DEPTH_THRESHOLD)
     print(run_info, file=handle)
 
 
@@ -222,7 +222,7 @@ def main(org=None, fastq=None, version='unknown', mut_file='final.csv', subtype_
 
     rh = open('report.md', 'w')
     write_subtype_info(rh, subtype_file)
-
+    write_run_info(rh)
     if org == 'HIV':
         resistance_mutations = parse_drm()
         write_header_HIV(rh, resistance_mutations)
