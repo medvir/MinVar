@@ -3,13 +3,21 @@
 
 import logging
 import os
+import sys
 import shlex
 import subprocess
 
-dn_dir = os.path.dirname(os.path.abspath(__file__))
 
-RAW_DEPTH_THRESHOLD = 50
-MIN_FRACTION = 0.015
+dn_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if __name__ == '__main__':
+    if __package__ is None:
+        os.sys.path.insert(1, dn_dir)
+        mod = __import__('minvar')
+        sys.modules["minvar"] = mod
+        from common import MIN_FRACTION, RAW_DEPTH_THRESHOLD
+else:
+    from .common import MIN_FRACTION, RAW_DEPTH_THRESHOLD
+
 MAPPING_QUALITY_THRESHOLD = 20
 
 try:

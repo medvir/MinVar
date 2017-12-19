@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Definitions, lists, resources, used throughout the tool."""
 
+MIN_FRACTION = 0.015
+RAW_DEPTH_THRESHOLD = 50
+
 # from Table 1 of 10.1002/hep.20819 and
 # from https://www.ncbi.nlm.nih.gov/projects/genotyping/view.cgi?db=3
 # acc number of confirmed HCV genotypes/subtypes

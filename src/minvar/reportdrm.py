@@ -8,6 +8,16 @@ from pkg_resources import resource_filename
 
 import pandas as pd
 
+dn_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if __name__ == '__main__':
+    if __package__ is None:
+        os.sys.path.insert(1, dn_dir)
+        mod = __import__('minvar')
+        sys.modules["minvar"] = mod
+        from common import MIN_FRACTION, RAW_DEPTH_THRESHOLD
+else:
+    from .common import MIN_FRACTION, RAW_DEPTH_THRESHOLD
+
 # from common import acc_numbers, hcv_map
 
 # aminoacid one-letter code
@@ -191,6 +201,19 @@ def write_contact_file(sample_id='unknown sample', version='unknown'):
     \end{minipage}"""
 
 
+def write_run_info(handle):
+    """Write general information on the run."""
+    run_info = """
+
+Run information
+---------------
+
+Mutations at single nucleotide positions were called with a %f%% frequency threshold and a minimum depth of %d reads.
+
+""" % (MIN_FRACTION, RAW_DEPTH_THRESHOLD)
+    print(run_info, file=handle)
+
+
 def main(org=None, fastq=None, version='unknown', mut_file='final.csv', subtype_file='subtype_evidence.csv'):
     """What the main does."""
     import subprocess
@@ -199,6 +222,7 @@ def main(org=None, fastq=None, version='unknown', mut_file='final.csv', subtype_
 
     rh = open('report.md', 'w')
     write_subtype_info(rh, subtype_file)
+
     if org == 'HIV':
         resistance_mutations = parse_drm()
         write_header_HIV(rh, resistance_mutations)
