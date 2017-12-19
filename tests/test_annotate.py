@@ -4,8 +4,9 @@ import os
 
 import pytest
 from Bio.Seq import Seq
+from Bio import SeqIO
 
-from src.minvar.annotate import find_frame, merge_mutations, parsevar
+from src.minvar.annotate import find_frame, merge_mutations, parsevar, compute_org_mutations, nt_freq_2_aa_freq
 
 subtype1a = '''GCCAGCCCCCTGATGGGGGCGACACTCCACCATGAATCACTCCCCTGTGAGGAACTACTG\
 TCTTCACGCAGAAAGCGTCTAGCCATGGCGTTAGTATGAGTGTCGTGCAGCCTCCAGGAC\
@@ -119,3 +120,42 @@ def test_merge_mutations():
     #     with self.subTest(mut=i):
     #         self.assertEqual(out_here.freq, freqs[i])
     #         self.assertEqual(out_here.mut, muts[i])
+
+
+def test_org_mutations():
+    short_aa = Seq('GACECPGRSRRPCTMSTNPKPQ')
+    muts = compute_org_mutations(short_aa, 'HCV')
+    os.remove('sample_vs_wt.fasta')
+    real_muts = muts[muts.mut != muts.wt]
+    assert real_muts.shape[0] <= 1
+
+    short_aa = \
+     Seq('PGPFLDKPAQCPEIWACPRKTASRVVLGRERPCGTA**GACECPGRSRRPCTMSTNPKPQRKTKRNTNRRPMDVKFPGGGQIVGGVYLLPRRGPRLGVRATRKTSERSQPRGRRQPIPKARQPEGRSWAQPGYPWPLYGNEGCGWAGWLLSPRGSRPSWGPNDPRRRSRNLGKVIDTLTC')
+    muts = compute_org_mutations(short_aa, 'HCV')
+    os.remove('sample_vs_wt.fasta')
+    real_muts = muts[muts.mut != muts.wt]
+    assert real_muts.shape[0] <= 5
+
+    long_aa_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'long_aa.fasta')
+    long_aa = list(SeqIO.parse(long_aa_file, 'fasta'))[0].seq
+    muts = compute_org_mutations(long_aa, 'HCV')
+    os.remove('sample_vs_wt.fasta')
+    real_muts = muts[muts.mut != muts.wt]
+    assert real_muts.shape[0] <= 650
+
+
+def test_nt_freq_2_aa_freq():
+    import pandas as pd
+    # all frames, no variants
+    before = 13  # codons before this
+    for frame in [1, 2, 3]:
+        df = pd.DataFrame({
+            'pos': [frame + 3 * before, 1 + frame + 3 * before, 2 + frame + 3 * before],
+            'mut': ['A', 'A', 'A'],
+            'freq': [1.0, 1.0, 1.0]
+        })
+        codon_pos, aas, freqs, haps = nt_freq_2_aa_freq(df, frame)
+        assert codon_pos[0] == before + 1
+        assert aas[0] == 'K'
+        assert freqs[0] == 1.0
+        assert haps[0] == 'AAA'
