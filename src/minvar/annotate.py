@@ -93,7 +93,7 @@ def find_frame(ref):
             best_frame = f
             max_len = len1
 #    to_trim = (len(refseq) - best_frame + 1) % 3
-    return best_frame, aa_seq[best_frame].strip('*')
+    return best_frame, aa_seq[best_frame].rstrip('*')
 
 
 def parsevar(vcf_file, ref_seq):
