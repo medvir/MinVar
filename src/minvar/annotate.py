@@ -362,9 +362,12 @@ def df_2_sequence(df_in):
 
     If a frequency column exists, select the positions with maximum frequency.
     """
+    # select row with max frequency for each position
     if 'freq' in df_in.columns:
         max_freq_idx = df_in.groupby(['pos'])['freq'].transform(max) == df_in['freq']
         df_in = df_in[max_freq_idx]
+    # this is needed for positions where frequency is 0.5/0.5
+    df_in = df_in.groupby('pos').first().reset_index()
     df_in = df_in.sort_values(by='pos', ascending=True)
     # extract first nt in case of insertions
     df_in['single_mut'] = df_in.apply(lambda row: row['mut'][0], axis=1)
@@ -465,7 +468,7 @@ def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_fi
     logging.info('save max frequency sequence to file')
     # generally slightly different from consensus reference
     max_freq_cns = Seq(df_2_sequence(merged))
-    assert len(max_freq_cns) == len(ref_nt)
+    assert len(max_freq_cns) == len(ref_nt), '%d - %d' % (len(max_freq_cns), len(ref_nt))
     SeqIO.write(SeqRecord(max_freq_cns, id='max_freq_cons', description=''), 'cns_max_freq.fasta', 'fasta')
     logging.info('translate max frequency sequence')
     frame_max, aa_framed_max = find_frame(max_freq_cns)
