@@ -5,7 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-- Bugfix: when the frequency of a mutation is 0.5/0.5, `cns_max_freq` is longer than the reference.
+- Bugfix: when no RAS mutation is found, `reportdrm` failed.
+- Bugfix: when the frequency of a mutation is 0.5/0.5, `cns_max_freq` was longer than the reference.
 - Problems with an assert when all reads have indels: removed the assert, `phase_mutations` has limitations.
 
 ## [v2.1.2] - 2017-12-19
