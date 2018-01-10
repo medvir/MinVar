@@ -286,6 +286,7 @@ def main(org=None, fastq=None, version='unknown', mut_file='final.csv', subtype_
             print('\n', file=rh)
     elif org == 'HCV':
         drms = pd.read_csv('merged_muts_drm_annotated.csv')
+        drms = drms.fillna("unknown")
         drms = drms[drms['CATEGORY'] == 'RAS']
         # logging.info('Shape of annotated_mutations is: %s', str(mutation_detected.shape))
 
