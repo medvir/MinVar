@@ -6,7 +6,8 @@ import pytest
 from Bio.Seq import Seq
 from Bio import SeqIO
 
-from src.minvar.annotate import find_frame, merge_mutations, parsevar, compute_org_mutations, nt_freq_2_aa_freq
+from src.minvar.annotate import (find_frame, merge_mutations, parsevar, compute_org_mutations, nt_freq_2_aa_freq,
+    df_2_sequence)
 
 subtype1a = '''GCCAGCCCCCTGATGGGGGCGACACTCCACCATGAATCACTCCCCTGTGAGGAACTACTG\
 TCTTCACGCAGAAAGCGTCTAGCCATGGCGTTAGTATGAGTGTCGTGCAGCCTCCAGGAC\
@@ -159,3 +160,21 @@ def test_nt_freq_2_aa_freq():
         assert aas[0] == 'K'
         assert freqs[0] == 1.0
         assert haps[0] == 'AAA'
+
+
+def test_df_2_sequence():
+    import pandas as pd
+    # standard case
+    m = pd.DataFrame({
+        'pos': [1, 2, 2, 3],
+        'freq': [1.0, 0.95, 0.05, 1.0],
+        'mut': ['A', 'C', 'A', 'T']
+        })
+    assert df_2_sequence(m) == 'ACT'
+    # what happens when frequency is equally split?
+    m2 = pd.DataFrame({
+        'pos': [1, 2, 2, 3],
+        'freq': [1.0, 0.5, 0.5, 1.0],
+        'mut': ['A', 'C', 'A', 'T']
+        })
+    assert df_2_sequence(m2) == 'ACT'
