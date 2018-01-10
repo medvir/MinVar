@@ -234,7 +234,7 @@ def phase_mutations(bam_file, start, end):
     haps = haps[haps.freq > HAPLO_FREQ_THRESHOLD]
     renorm = haps.freq.sum()
     haps.freq = haps.freq / renorm
-    assert abs(haps.freq.sum() - 1.0) < 1.E-4
+    # assert abs(haps.freq.sum() - 1.0) < 1.E-4, haps
     return haps
 
 
