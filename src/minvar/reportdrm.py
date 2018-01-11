@@ -72,13 +72,13 @@ def parse_ras():
 def write_subtype_info(handle, subtype_file=None):
     """Write information on subtyping."""
     from operator import itemgetter
-    md_header = 'Drug resistance mutations detected by NGS sequencing'
-    md_header += '\n' + '=' * len(md_header) + '\n\n'
-    md_header += 'Subtype inference with blast\n'
-    md_header += '----------------------------\n'
-    md_header += '|     subtype     | support [%] |\n'
-    md_header += '|:{:-^15}:|:{:-^11}:|\n'.format('', '')
     if subtype_file:
+        md_header = 'Drug resistance mutations detected by NGS sequencing'
+        md_header += '\n' + '=' * len(md_header) + '\n\n'
+        md_header += 'Subtype inference with blast\n'
+        md_header += '----------------------------\n'
+        md_header += '|     subtype     | support [%] |\n'
+        md_header += '|:{:-^15}:|:{:-^11}:|\n'.format('', '')
         save_freq = {}
         with open(subtype_file) as csvfile:
             spamreader = csv.reader(csvfile, delimiter=',')
@@ -89,6 +89,8 @@ def write_subtype_info(handle, subtype_file=None):
         for k, v in sorted(save_freq.items(), key=itemgetter(1),
                            reverse=True):
             md_header += '|{: ^17}|{: ^13}|\n'.format(k, v)
+    else:
+        md_header = '\n'
     print(md_header, file=handle)
 
 
@@ -214,12 +216,9 @@ Mutations at single nucleotide positions were called with a %4.1f%% frequency th
     print(run_info, file=handle)
 
 
-def main(org=None, fastq=None, version='unknown', mut_file='final.csv', subtype_file='subtype_evidence.csv'):
-    """What the main does."""
-    import subprocess
-    import shutil
-    import re
-
+def write_md(org=None, mut_file='final.csv', subtype_file='subtype_evidence.csv'):
+    """Write the markdown file."""
+    logging.info('Writing report in markdown')
     rh = open('report.md', 'w')
     write_subtype_info(rh, subtype_file)
     write_run_info(rh)
@@ -229,6 +228,13 @@ def main(org=None, fastq=None, version='unknown', mut_file='final.csv', subtype_
     elif org == 'HCV':
         resistance_mutations = parse_ras()
         write_header_HCV(rh, resistance_mutations)
+    elif org is None:
+        md = """
+No HIV/HCV read found
+=====================
+"""
+        print(md, file=rh)
+        return
 
     logging.info('Reading mutations from %s', mut_file)
     mutation_detected = pd.read_csv(mut_file)
@@ -320,6 +326,12 @@ def main(org=None, fastq=None, version='unknown', mut_file='final.csv', subtype_
             print('\n', file=rh)
     rh.close()
 
+
+def convert_2_pdf(fastq=None, version='unknown'):
+    """Convert markdown file to pdf with pandoc, filling sample and version info."""
+    import subprocess
+    import shutil
+    import re
     # copy template to current directory
     tmpl_file = resource_filename(__name__, 'db/template.tex')
     shutil.copy(tmpl_file, os.getcwd())
@@ -330,7 +342,7 @@ def main(org=None, fastq=None, version='unknown', mut_file='final.csv', subtype_
     except AttributeError:
         sample_id = 'unknown'
     write_contact_file(sample_id=sample_id, version=version)
-    # convert to PDF with pandoc
+    logging.info('Converting markdown to pdf with pandoc')
     pand_cml = 'pandoc --template=./template.tex report.md -o report.pdf'
     logging.debug(pand_cml)
     subprocess.call(pand_cml, shell=True)
@@ -338,6 +350,11 @@ def main(org=None, fastq=None, version='unknown', mut_file='final.csv', subtype_
     os.remove('contact.tex')
 
 
+def main(org=None, subtype_file=None, fastq='unknown', version='unknown'):
+    """What the main does."""
+    write_md(org=org, mut_file='final.csv', subtype_file=subtype_file)
+    convert_2_pdf(fastq=fastq, version=version)
+
+
 if __name__ == '__main__':
-    main(org=sys.argv[1], fastq='xyz', version='unknown', mut_file='final.csv',
-         subtype_file='subtype_evidence.csv')
+    main(org=sys.argv[1])

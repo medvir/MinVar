@@ -135,6 +135,9 @@ def find_subtype(reads_file, sampled_reads=1000, recomb=False):
 
     # read blast results and assigns to best subjects
     loc_hits = pd.read_csv(loc_hit_file, names=cols, delimiter="\t")
+    if loc_hits.empty:
+        logging.warning('No HIV/HCV read was found')
+        return None, {}, None
     n_hits = loc_hits.shape[0]
     queries = len(set(loc_hits['qseqid']))
     logging.info('blast queries: %d\tHits: %d', queries, n_hits)
@@ -423,6 +426,8 @@ def main(read_file=None, max_n_reads=200000):
 
     # infer organism and subtype
     organism, support_freqs, acc = find_subtype(filtered_file)
+    if support_freqs == {}:
+        return None, None, None
     logging.info('%s sequences detected', organism)
     max_support = max(support_freqs.values())
 
@@ -479,5 +484,4 @@ def main(read_file=None, max_n_reads=200000):
 
 
 if __name__ == "__main__":
-    import sys
     main(sys.argv[1])

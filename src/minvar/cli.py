@@ -73,6 +73,11 @@ def main(args=None):
     from minvar import prepare
     cns_file, prepared_bam, org_found = prepare.main(args.f)
 
+    if cns_file is None:
+        from minvar import reportdrm
+        reportdrm.main()
+        sys.exit()
+
     from minvar import callvar
     called_file, called_bam = callvar.main(ref_file=cns_file,
                                            bamfile=prepared_bam,
@@ -84,7 +89,7 @@ def main(args=None):
                   organism=org_found)
 
     from minvar import reportdrm
-    reportdrm.main(org=org_found, fastq=args.f, version=__version__)
+    reportdrm.main(org=org_found, subtype_file='subtype_evidence.csv', fastq=args.f, version=__version__)
 
     if not args.keep:
         for f in files_to_remove:
