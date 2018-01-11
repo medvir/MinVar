@@ -73,11 +73,6 @@ def main(args=None):
     from minvar import prepare
     cns_file, prepared_bam, org_found = prepare.main(args.f)
 
-    if cns_file is None:
-        from minvar import reportdrm
-        reportdrm.main(fastq=args.f, version=__version__)
-        sys.exit()
-
     from minvar import callvar
     called_file, called_bam = callvar.main(ref_file=cns_file,
                                            bamfile=prepared_bam,

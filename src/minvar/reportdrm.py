@@ -72,7 +72,7 @@ def parse_ras():
 def write_subtype_info(handle, subtype_file=None):
     """Write information on subtyping."""
     from operator import itemgetter
-    if subtype_file:
+    if os.path.exists(subtype_file):
         md_header = 'Drug resistance mutations detected by NGS sequencing'
         md_header += '\n' + '=' * len(md_header) + '\n\n'
         md_header += 'Subtype inference with blast\n'
@@ -337,12 +337,10 @@ def convert_2_pdf(fastq=None, version='unknown'):
     shutil.copy(tmpl_file, os.getcwd())
     # write contact.tex to be included in template
     fastq_base = os.path.basename(fastq)
-    print(fastq_base)
     try:
         sample_id = re.search(r'(.*)_S\d*', fastq_base).group(1)
     except AttributeError:
         sample_id = 'unknown'
-    print(sample_id)
     write_contact_file(sample_id=sample_id, version=version)
     logging.info('Converting markdown to pdf with pandoc')
     pand_cml = 'pandoc --template=./template.tex report.md -o report.pdf'

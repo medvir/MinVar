@@ -447,6 +447,11 @@ def gene_name_pos(df_in):
 def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_file='hq_2_cns_final_recal.bam',
          organism='HCV'):
     """What the main does."""
+    if vcf_file is None:
+        for fname in ['merged_muts_drm_annotated.csv', 'cns_max_freq.fasta']:
+            fhandle = open(fname, 'a')
+            fhandle.close()
+        return
     # ref_file is the sample consensus
     ref_nt = list(SeqIO.parse(ref_file, 'fasta'))[0]
     frame_ref, aa_framed_ref = find_frame(ref_nt.seq)

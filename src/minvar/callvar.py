@@ -212,6 +212,8 @@ def call_variants(ref_file=None, bamfile=None, parallel=True, n_regions=8,
 def main(ref_file=None, bamfile=None, parallel=True, n_regions=6,
          caller='lofreq', recalibrate=True):
     """What a main does."""
+    if ref_file is None:
+        return None, None
     ref_file = shlex.quote(ref_file)
     bamfile = shlex.quote(bamfile)
     # call variants
