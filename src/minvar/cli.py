@@ -75,7 +75,7 @@ def main(args=None):
 
     if cns_file is None:
         from minvar import reportdrm
-        reportdrm.main()
+        reportdrm.main(fastq=args.f, version=__version__)
         sys.exit()
 
     from minvar import callvar
