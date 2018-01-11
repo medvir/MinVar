@@ -7,16 +7,25 @@ import os.path
 import shlex
 import shutil
 import subprocess
+import sys
 
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from pkg_resources import resource_filename
 
-from .common import hcv_map, org_dict
-from .stats import (genome_coverage, start_stop_coverage)
+dn_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if __name__ == '__main__':
+    if __package__ is None:
+        os.sys.path.insert(1, dn_dir)
+        mod = __import__('minvar')
+        sys.modules["minvar"] = mod
+        from common import hcv_map, org_dict
+        from stats import (genome_coverage, start_stop_coverage)
+else:
+    from .common import hcv_map, org_dict
+    from .stats import (genome_coverage, start_stop_coverage)
 
-dn_dir = os.path.dirname(os.path.abspath(__file__))
 HCV_references = resource_filename(__name__, 'db/HCV/subtype_references.fasta')
 HIV_references = resource_filename(__name__, 'db/HIV/subtype_references.fasta')
 HCV_recomb_references = \
@@ -142,12 +151,12 @@ def find_subtype(reads_file, sampled_reads=1000, recomb=False):
             support[org_dict[m.split('.')[0]]] += 1. / len(matching)
 
     max_freq = max(freqs.values())
-    organism = max(support, key=support.get)
+    organism_here = max(support, key=support.get)
     freq2 = {}
     for k, v in freqs.items():
-        if organism == 'HCV':
+        if organism_here == 'HCV':
             # replace accession numbers with genotypes
-            gt = hcv_map[k.split('.')[0]]
+            gt = hcv_map.get(k.split('.')[0], k.split('.')[0])
         else:
             # HIV references already have subtypes in the name
             gt = k
@@ -156,7 +165,7 @@ def find_subtype(reads_file, sampled_reads=1000, recomb=False):
         if v == max_freq:
             max_acc = k
 
-    return organism, freq2, max_acc
+    return organism_here, freq2, max_acc
 
 
 def align_reads(ref=None, reads=None, out_file=None, mapper='bwa'):
