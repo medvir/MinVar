@@ -3,8 +3,12 @@
 % Page geometry
 \usepackage{geometry}
 \geometry{
-  margin=0.5in,% Equal margin of 0.5in from all four sides
-  includefoot% Include only the footer in the margin calculations, since you don't have a header
+  left=0.5in,
+  right=0.5in,
+  top=0.15in,
+  bottom=0.15in,
+  includefoot,% Include footer in the margin calculations
+  includehead% Include header
 }
 % set default font to sans serif
 \renewcommand\familydefault{\sfdefault}
@@ -26,6 +30,7 @@
 \fancyhf{}% Clear headers and footers
 \renewcommand{\headrulewidth}{0pt}% No header rule
 \renewcommand{\footrulewidth}{0pt}% No footer rule (default)
+\fancyhead[R]{\today}
 \fancyfoot[R]{\thepage\ of \pageref{LastPage}}
 
 \usepackage{hyperref,graphicx}

@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- Date added on every page of the report.
 - Bugfix: minvar now works evene when neither HCV nor HIV reads are present.
 - Bugfix: `find_subtype` failed when reads from both HIV and HCV were present.
 - Bugfix: when no RAS mutation is found, `reportdrm` failed.

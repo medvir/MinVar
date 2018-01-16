@@ -72,7 +72,8 @@ def parse_ras():
 def write_subtype_info(handle, subtype_file=None):
     """Write information on subtyping."""
     from operator import itemgetter
-    if os.path.exists(subtype_file):
+    try:
+    #if os.path.exists(subtype_file):
         md_header = 'Drug resistance mutations detected by NGS sequencing'
         md_header += '\n' + '=' * len(md_header) + '\n\n'
         md_header += 'Subtype inference with blast\n'
@@ -89,7 +90,7 @@ def write_subtype_info(handle, subtype_file=None):
         for k, v in sorted(save_freq.items(), key=itemgetter(1),
                            reverse=True):
             md_header += '|{: ^17}|{: ^13}|\n'.format(k, v)
-    else:
+    except:
         md_header = '\n'
     print(md_header, file=handle)
 
@@ -169,7 +170,7 @@ def write_contact_file(sample_id='unknown sample', version='unknown'):
         }
     oh = open('contact.tex', 'w')
     oh.write(r'\fancyfoot[L]{sample: %s}' % sample_id + '\n')
-    oh.write(r'\fancyfoot[C]{\texttt{built with MinVar version: %s}}' % version + '\n')
+    oh.write(r'\fancyfoot[C]{\texttt{MinVar version: %s}}' % version + '\n')
     oh.write(r'\begin{minipage}{0.5\textwidth}' + '\n')
     if 'logo' in contact_dict.keys():
         logo_file = os.path.expanduser(os.path.join('~/.minvar/', contact_dict['logo']))
@@ -178,7 +179,7 @@ def write_contact_file(sample_id='unknown sample', version='unknown'):
     oh.write(r'\hfill' + '\n')
     oh.write(r'\begin{minipage}{0.45\textwidth}' + '\n')
     oh.write(r'\begin{tabular}{@{}r@{}}' + '\n')
-    oh.write(r'\today \\[\normalbaselineskip]' + '\n')
+    #oh.write(r'\today \\[\normalbaselineskip]' + '\n')
     oh.write(r'%s\\' % contact_dict['unit'] + '\n')
     oh.write(r'phone: %s\\' % contact_dict['phone'] + '\n')
     oh.write(r'fax: %s\\' % contact_dict['fax'] + '\n')
