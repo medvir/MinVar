@@ -282,8 +282,13 @@ No HIV/HCV read found
                 # # same pos mut tuple must give same annota, probably redundant
                 # assert group['category'].nunique() == 1, \
                 #     group['category'].describe()
-                mut_cat = row['category']
                 int_freq = int(round(100 * row['freq'], 0))
+                if int_freq == 0:
+                    continue
+                if 'major' in row['category'].lower() or 'nrti' in row['category'].lower():
+                    mut_cat = '**%s**' % row['category']
+                else:
+                    mut_cat = row['category']
                 print(
                     '|{: ^10}|{: ^10}|{: ^15}|{: ^20}|'.format(int(row['pos']),
                                                                row['mut'],
@@ -319,6 +324,8 @@ No HIV/HCV read found
             print(h2.format('', '', '', ''), file=rh)
             for index, row in gene_muts.iterrows():
                 int_freq = int(round(100 * row['freq'], 0))
+                if int_freq == 0:
+                    continue
                 category = row['CATEGORY']
                 print(
                     '|{: ^10}|{: ^10}|{: ^15}|{: ^12}'.format(int(row['pos']), row['mut'], int_freq, category),
@@ -358,4 +365,4 @@ def main(org=None, subtype_file=None, fastq='unknown', version='unknown'):
 
 
 if __name__ == '__main__':
-    main(org=sys.argv[1])
+    main(org=sys.argv[1], subtype_file='subtype_evidence.csv')
