@@ -4,6 +4,8 @@ import sys
 import os
 import csv
 import logging
+import shlex
+import subprocess
 from pkg_resources import resource_filename
 
 import pandas as pd
@@ -22,6 +24,9 @@ else:
 
 # aminoacid one-letter code
 aa_set = set('GPAVLIMCFYWHKRQNEDST')
+
+# mutations below this threshold do not contribute to drug prediction via HIVdb
+sierra_threshold = 0.2
 
 # amminoacid sequences from files in db directory
 # dn_dir = os.path.dirname(__file__)
@@ -95,11 +100,61 @@ def write_subtype_info(handle, subtype_file=None):
     print(md_header, file=handle)
 
 
+def write_sierra_results(handle, mut_file):
+    """Run sierrapy patterns results."""
+
+    import json
+    mutations = pd.read_csv(mut_file)
+    mutations = mutations[mutations['freq'] >= sierra_threshold]
+    mutations = mutations[mutations['gene'] != 'GagPolTF']
+    gmap = {'protease': 'PR', 'RT': 'RT', 'integrase': 'IN'}
+    mutations['pattern'] = mutations.apply(
+        lambda m: '%s:%s%d%s' % (gmap[m['gene']], m['wt'], m['pos'], m['mut']), axis=1)
+    ptn = ' + '.join(mutations['pattern'])
+    with open('pattern.txt', 'w') as h:
+        h.write(ptn + '\n')
+    cml = shlex.split('sierrapy patterns pattern.txt -o o.json')
+    logging.debug(cml)
+    subprocess.call(cml)
+    with open('o.json') as h:
+        patterns = json.load(h)
+    os.remove('o.json')
+    os.remove('pattern.txt')
+    assert len(patterns) == 1
+    pattern = patterns[0]
+    version = pattern['drugResistance'][0]['version']['text']
+    pubdate = pattern['drugResistance'][0]['version']['publishDate']
+    print('Drug Resistance Interpretation', file=handle)
+    print('==============================\n', file=handle)
+    print('HIVdb version %s, pubdate %s.\n' % (version, pubdate), file=handle)
+    print('Mutations below %d%% were not included.\n' % (100 * sierra_threshold), file=handle)
+
+    for dr in pattern['drugResistance']:
+        gene_name = dr['gene']['name']
+        print(gene_name, file=handle)
+        print('-' * len(gene_name) + '\n', file=handle)
+        print('| class | name |  score  |           assessment           |               mutations                |',
+              file=handle)
+        print('|:{:-^5}:|:{:-^4}:| {:-^7}:|:{:-^30}:|:{:-^38}:|'.format('', '', '', '', ''), file=handle)
+
+        for drugscore in dr['drugScores']:
+            drugClass = drugscore['drugClass']['name']
+            drug = drugscore['drug']['name']
+            all_muts = ' + '.join((partial['mutations'][0]['text'] for partial in drugscore['partialScores']))
+            print('|{: ^7}|{: ^6}|{: ^9}|{: ^32}|{: ^40}|'.format(
+                drugClass, drug, drugscore['score'], drugscore['text'], all_muts), file=handle)
+        print('', file=handle)
+            # for partial in drugscore['partialScores']:
+            #     if len(partial['mutations']) > 1:
+            #         pprint(partial)
+            # assert len(partial['mutations']) == 1, partial['mutations']
+    print('\\newpage', file=handle)
+
+
 def write_header_HIV(handle, drms=None):
     """Write header to a file in markdown format."""
 
-    md_header = """
-
+    md_header = """\
 Parsing mutations
 -----------------
 
@@ -225,7 +280,7 @@ def write_md(org=None, mut_file='final.csv', subtype_file='subtype_evidence.csv'
     write_run_info(rh)
     if org == 'HIV':
         resistance_mutations = parse_drm()
-        write_header_HIV(rh, resistance_mutations)
+        write_sierra_results(rh, mut_file)
     elif org == 'HCV':
         resistance_mutations = parse_ras()
         write_header_HCV(rh, resistance_mutations)
@@ -247,6 +302,7 @@ No HIV/HCV read found
     logging.info('Shape of raw merged is: %s', str(mpd.shape))
 
     if org == 'HIV':
+        write_header_HIV(rh, resistance_mutations)
         # too complicated with panda, do it by hand
         drms = parse_merged('merged_muts_drm_annotated.csv')
         logging.info('Shape of elaborated merged is: %s', str(drms.shape))
@@ -261,6 +317,9 @@ No HIV/HCV read found
                          ascending=[True, True, False])
         drms.to_csv('annotated_DRM.csv', index=False)
 
+        print('Mutations detected', file=rh)
+        print('==================\n', file=rh)
+        write_header_HIV(rh, resistance_mutations)
         for gene in ['protease', 'RT', 'integrase']:
             gene_muts = drms[drms.gene == gene]
             if gene_muts.shape[0] == 0:
@@ -273,7 +332,7 @@ No HIV/HCV read found
             gene_muts = gene_muts.sort_values(
                 by=['gene', 'pos', 'freq'], ascending=[True, True, False])
             print('%s' % gene, file=rh)
-            print('-'*len(gene), file=rh)
+            print('-' * len(gene) + '\n', file=rh)
             h1 = '| position | mutation | frequency [%] |      category      |'
             print(h1, file=rh)
             h2 = '|:{:-^8}:|:{:-^8}:|:{:-^13}:|:{:-^18}:|'
@@ -337,7 +396,6 @@ No HIV/HCV read found
 
 def convert_2_pdf(fastq=None, version='unknown'):
     """Convert markdown file to pdf with pandoc, filling sample and version info."""
-    import subprocess
     import shutil
     import re
     # copy template to current directory
@@ -365,4 +423,5 @@ def main(org=None, subtype_file=None, fastq='unknown', version='unknown'):
 
 
 if __name__ == '__main__':
+    #write_sierra_results(sys.stdout, 'final.csv')
     main(org=sys.argv[1], subtype_file='subtype_evidence.csv')
