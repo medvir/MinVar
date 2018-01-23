@@ -28,6 +28,15 @@ aa_set = set('GPAVLIMCFYWHKRQNEDST')
 # mutations below this threshold do not contribute to drug prediction via HIVdb
 sierra_threshold = 0.2
 
+# colour cells according to susceptibility
+cell_colour = {
+    'Susceptible': 'resistance2',
+    'Potential Low-Level Resistance': 'resistance3',
+    'Low-Level Resistance': 'resistance4',
+    'Intermediate Resistance': 'resistance5',
+    'High-Level Resistance': 'resistance6'
+}
+
 # amminoacid sequences from files in db directory
 # dn_dir = os.path.dirname(__file__)
 # db_dir = os.path.abspath(os.path.join(dn_dir, 'db'))
@@ -95,7 +104,7 @@ def write_subtype_info(handle, subtype_file=None):
         for k, v in sorted(save_freq.items(), key=itemgetter(1),
                            reverse=True):
             md_header += '|{: ^17}|{: ^13}|\n'.format(k, v)
-    except:
+    except FileNotFoundError:
         md_header = '\n'
     print(md_header, file=handle)
 
@@ -107,7 +116,10 @@ def write_sierra_results(handle, mut_file):
     mutations = pd.read_csv(mut_file)
     mutations = mutations[mutations['freq'] >= sierra_threshold]
     mutations = mutations[mutations['gene'] != 'GagPolTF']
+    mutations = mutations[mutations['gene'] != 'RNase']
+    mutations = mutations[mutations['wt'] != '*']
     gmap = {'protease': 'PR', 'RT': 'RT', 'integrase': 'IN'}
+    gmap_inverse = {'PR': 'protease', 'IN': 'integrase'}
     mutations['pattern'] = mutations.apply(
         lambda m: '%s:%s%d%s' % (gmap[m['gene']], m['wt'], m['pos'], m['mut']), axis=1)
     ptn = ' + '.join(mutations['pattern'])
@@ -131,22 +143,33 @@ def write_sierra_results(handle, mut_file):
 
     for dr in pattern['drugResistance']:
         gene_name = dr['gene']['name']
-        print(gene_name, file=handle)
+        comments_set = set()
+        print(gmap_inverse.get(gene_name, gene_name), file=handle)
         print('-' * len(gene_name) + '\n', file=handle)
-        print('| class | name |  score  |           assessment           |               mutations                |',
+        print('| class | name |  score  |      assessment      |               mutations                |',
               file=handle)
-        print('|:{:-^5}:|:{:-^4}:| {:-^7}:|:{:-^30}:|:{:-^38}:|'.format('', '', '', '', ''), file=handle)
+        print('|:{:-^5}:|:{:-^4}:| {:-^7}:|:{:-^20}:|:{:-^39}|'.format('', '', '', '', ''), file=handle)
 
         for drugscore in dr['drugScores']:
             drugClass = drugscore['drugClass']['name']
             drug = drugscore['drug']['name']
             all_muts = ' + '.join((partial['mutations'][0]['text'] for partial in drugscore['partialScores']))
-            print('|{: ^7}|{: ^6}|{: ^9}|{: ^32}|{: ^40}|'.format(
-                drugClass, drug, drugscore['score'], drugscore['text'], all_muts), file=handle)
+
+            colour = cell_colour.get(drugscore['text'], 'white')
+            print('| {: ^7}|{: ^6}|{: ^9}|\\cellcolor{{{}}}{: ^22}|{: ^40}|'.format(
+                drugClass, drug, drugscore['score'], colour, drugscore['text'], all_muts), file=handle)
+            for partial in drugscore['partialScores']:
+                for mutations in partial['mutations']:
+                    for pmm in mutations['comments']:
+                        comments_set.add(pmm['text'])
+        print('', file=handle)
+        for cm in comments_set:
+            print('- %s' % cm, file=handle)
+
         print('', file=handle)
             # for partial in drugscore['partialScores']:
-            #     if len(partial['mutations']) > 1:
-            #         pprint(partial)
+            #  if len(partial['mutations']) > 1:
+            #      pprint(partial)
             # assert len(partial['mutations']) == 1, partial['mutations']
     print('\\newpage', file=handle)
 
@@ -302,7 +325,6 @@ No HIV/HCV read found
     logging.info('Shape of raw merged is: %s', str(mpd.shape))
 
     if org == 'HIV':
-        write_header_HIV(rh, resistance_mutations)
         # too complicated with panda, do it by hand
         drms = parse_merged('merged_muts_drm_annotated.csv')
         logging.info('Shape of elaborated merged is: %s', str(drms.shape))
@@ -319,7 +341,7 @@ No HIV/HCV read found
 
         print('Mutations detected', file=rh)
         print('==================\n', file=rh)
-        write_header_HIV(rh, resistance_mutations)
+        # write_header_HIV(rh, resistance_mutations)
         for gene in ['protease', 'RT', 'integrase']:
             gene_muts = drms[drms.gene == gene]
             if gene_muts.shape[0] == 0:
