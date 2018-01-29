@@ -66,6 +66,35 @@ for i in range(596, 716):
 for i in range(716, 1004):
     consensus_B_map[i] = 'integrase', i - 715
 
+# map names in consensus file to subtypes
+hiv_map = {
+    'CONSENSUS_01_AE': 'CRF01_AE',
+    'CONSENSUS_02_AG': 'CRF02_AG',
+    'CONSENSUS_03_AB': 'CRF03_AB',
+    'CONSENSUS_04_CPX': 'CRF04_cpx',
+    'CONSENSUS_06_CPX': 'CRF06_cpx',
+    'CONSENSUS_08_BC': 'CRF08_BC',
+    'CONSENSUS_10_CD': 'CRF10_CD',
+    'CONSENSUS_11_CPX': 'CRF_11_cpx',
+    'CONSENSUS_12_BF': 'CRF12_BF',
+    'CONSENSUS_14_BG': 'CRF_14_BG',
+    'CON_OF_CONS': 'unspecified',
+    'Mgroup': 'unspecified',
+    'CONSENSUS_A1': 'A1',
+    'A1.anc': 'A1',
+    'CONSENSUS_A2': 'A2',
+    'CONSENSUS_B': 'B',
+    'B.anc': 'B',
+    'CONSENSUS_C': 'C',
+    'C.anc': 'C',
+    'CONSENSUS_D': 'D',
+    'CONSENSUS_F1': 'F1',
+    'CONSENSUS_F2': 'F2',
+    'CONSENSUS_G': 'G',
+    'CONSENSUS_H': 'H'
+}
+
+
 org_dict = {
     'CON_OF_CONS': 'HIV',
     'Mgroup': 'HIV',

@@ -90,10 +90,6 @@ def write_subtype_info(handle, subtype_file=None):
     #if os.path.exists(subtype_file):
         md_header = 'Drug resistance mutations detected by NGS sequencing'
         md_header += '\n' + '=' * len(md_header) + '\n\n'
-        md_header += 'Subtype inference with blast\n'
-        md_header += '----------------------------\n'
-        md_header += '|     subtype     | support [%] |\n'
-        md_header += '|:{:-^15}:|:{:-^11}:|\n'.format('', '')
         save_freq = {}
         with open(subtype_file) as csvfile:
             spamreader = csv.reader(csvfile, delimiter=',')
@@ -101,13 +97,17 @@ def write_subtype_info(handle, subtype_file=None):
                 int_freq = int(round(100 * float(freq), 0))
                 if int_freq >= 1:
                     save_freq[mtype] = save_freq.get(mtype, 0) + int_freq
-        for k, v in sorted(save_freq.items(), key=itemgetter(1),
-                           reverse=True):
-            md_header += '|{: ^17}|{: ^13}|\n'.format(k, v)
+        top_gt, support = sorted(save_freq.items(), key=itemgetter(1), reverse=True)[0]
+        if support >= 50:
+            md_header += 'Inferred subtype: %s (blast support %d %%)\n' % (top_gt, support)
+            md_header += '-----------------------------------------\n'
+        else:
+            md_header += 'Subtype not inferred: (blast support too low)\n'
+            md_header += '---------------------------------------------\n'
+
     except FileNotFoundError:
         md_header = '\n'
     print(md_header, file=handle)
-
 
 def write_sierra_results(handle, mut_file):
     """Run sierrapy patterns results."""
@@ -138,7 +138,7 @@ def write_sierra_results(handle, mut_file):
     pubdate = pattern['drugResistance'][0]['version']['publishDate']
     print('Drug Resistance Interpretation', file=handle)
     print('==============================\n', file=handle)
-    print('HIVdb version %s, pubdate %s.\n' % (version, pubdate), file=handle)
+    print('Stanford HIVdb version %s, pubdate %s.\n' % (version, pubdate), file=handle)
     print('Mutations below %d%% were not included.\n' % (100 * sierra_threshold), file=handle)
 
     for dr in pattern['drugResistance']:

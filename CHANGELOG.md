@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Subtype inference only reports top hit, subtype names are now clearer.
+- Cells of drug resistance report are colour coded.
+- The report includes levels of drug resistance inferred by [HIVdb](https://hivdb.stanford.edu/hivdb/by-mutations/).
+
 ## [v2.1.3] - 2017-01-18
 - Date added on every page of the report, major mutations are in bold.
 - Bugfix: minvar now works evene when neither HCV nor HIV reads are present.

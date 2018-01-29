@@ -20,10 +20,10 @@ if __name__ == '__main__':
         os.sys.path.insert(1, dn_dir)
         mod = __import__('minvar')
         sys.modules["minvar"] = mod
-        from common import hcv_map, org_dict
+        from common import hcv_map, hiv_map, org_dict
         from stats import (genome_coverage, start_stop_coverage)
 else:
-    from .common import hcv_map, org_dict
+    from .common import hcv_map, hiv_map, org_dict
     from .stats import (genome_coverage, start_stop_coverage)
 
 HCV_references = resource_filename(__name__, 'db/HCV/subtype_references.fasta')
@@ -162,7 +162,7 @@ def find_subtype(reads_file, sampled_reads=1000, recomb=False):
             gt = hcv_map.get(k.split('.')[0], k.split('.')[0])
         else:
             # HIV references already have subtypes in the name
-            gt = k
+            gt = hiv_map.get(k)
         freq2[gt] = freq2.get(gt, 0.0) + freqs[k]
         # save sequence id of best hit
         if v == max_freq:
