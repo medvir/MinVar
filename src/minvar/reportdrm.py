@@ -16,9 +16,9 @@ if __name__ == '__main__':
         os.sys.path.insert(1, dn_dir)
         mod = __import__('minvar')
         sys.modules["minvar"] = mod
-        from common import MIN_FRACTION, RAW_DEPTH_THRESHOLD
+        from common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names
 else:
-    from .common import MIN_FRACTION, RAW_DEPTH_THRESHOLD
+    from .common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names
 
 # from common import acc_numbers, hcv_map
 
@@ -99,7 +99,7 @@ def write_subtype_info(handle, subtype_file=None):
                     save_freq[mtype] = save_freq.get(mtype, 0) + int_freq
         top_gt, support = sorted(save_freq.items(), key=itemgetter(1), reverse=True)[0]
         if support >= 50:
-            md_header += 'Inferred subtype: %s (blast support %d %%)\n' % (top_gt, support)
+            md_header += 'Inferred subtype: %s (blast support: %d %%)\n' % (top_gt, support)
             md_header += '-----------------------------------------\n'
         else:
             md_header += 'Subtype not inferred: (blast support too low)\n'
@@ -127,10 +127,10 @@ def write_sierra_results(handle, mut_file):
         h.write(ptn + '\n')
     cml = shlex.split('sierrapy patterns pattern.txt -o o.json')
     logging.debug(cml)
-    subprocess.call(cml)
+    #subprocess.call(cml)
     with open('o.json') as h:
         patterns = json.load(h)
-    os.remove('o.json')
+    #os.remove('o.json')
     os.remove('pattern.txt')
     assert len(patterns) == 1
     pattern = patterns[0]
@@ -138,7 +138,7 @@ def write_sierra_results(handle, mut_file):
     pubdate = pattern['drugResistance'][0]['version']['publishDate']
     print('Drug Resistance Interpretation', file=handle)
     print('==============================\n', file=handle)
-    print('Stanford HIVdb version %s, pubdate %s.\n' % (version, pubdate), file=handle)
+    print('Stanford HIVdb version %s, pubdate %s.' % (version, pubdate), file=handle)
     print('Mutations below %d%% were not included.\n' % (100 * sierra_threshold), file=handle)
 
     for dr in pattern['drugResistance']:
@@ -146,17 +146,18 @@ def write_sierra_results(handle, mut_file):
         comments_set = set()
         print(gmap_inverse.get(gene_name, gene_name), file=handle)
         print('-' * len(gene_name) + '\n', file=handle)
-        print('| class | name |  score  |      assessment      |               mutations                |',
+        print('| class |         name         | score|      assessment      |               mutations                |',
               file=handle)
-        print('|:{:-^5}:|:{:-^4}:| {:-^7}:|:{:-^20}:|:{:-^39}|'.format('', '', '', '', ''), file=handle)
+        print('|:{:-^5}:|:{:-^20}:| {:-^4}:|:{:-^20}:|:{:-^39}|'.format('', '', '', '', ''), file=handle)
 
         for drugscore in dr['drugScores']:
             drugClass = drugscore['drugClass']['name']
-            drug = drugscore['drug']['name']
+            drug = drug_names.get(drugscore['drug']['name'], drugscore['drug']['name'])
+            drug += ' (%s)' % drugscore['drug']['displayAbbr']
             all_muts = ' + '.join((partial['mutations'][0]['text'] for partial in drugscore['partialScores']))
 
             colour = cell_colour.get(drugscore['text'], 'white')
-            print('| {: ^7}|{: ^6}|{: ^9}|\\cellcolor{{{}}}{: ^22}|{: ^40}|'.format(
+            print('|{: ^7}|{: ^22}|{: ^6}|\\cellcolor{{{}}}{: ^22}|{: ^40}|'.format(
                 drugClass, drug, drugscore['score'], colour, drugscore['text'], all_muts), file=handle)
             for partial in drugscore['partialScores']:
                 for mutations in partial['mutations']:
@@ -264,6 +265,7 @@ def write_contact_file(sample_id='unknown sample', version='unknown'):
     oh.write(r'email: \href{mailto:%s}{%s}\\' % (contact_dict['email'], contact_dict['email']) + '\n')
     oh.write(r'\end{tabular}' + '\n')
     oh.write(r'\end{minipage}' + '\n')
+    oh.write(r'\vspace{1cm}' + '\n')
 
     r"""\fancyfoot[L]{John Smith \quad - \quad \href{mailto:john@smith.com}{{\small john@smith.com}}}
 
@@ -273,7 +275,7 @@ def write_contact_file(sample_id='unknown sample', version='unknown'):
     \hfill
     \begin{minipage}{0.45\textwidth}
     \begin{tabular}{@{}r@{}}
-      \today \\[\normalbaselineskip]
+      %\DTMnow \\[\normalbaselineskip]
       Institute of Medical Virology \\
       Telephone + 41 44 63 42653  \\
       Fax + 41 44 63 44967 \\
@@ -300,7 +302,7 @@ def write_md(org=None, mut_file='final.csv', subtype_file='subtype_evidence.csv'
     logging.info('Writing report in markdown')
     rh = open('report.md', 'w')
     write_subtype_info(rh, subtype_file)
-    write_run_info(rh)
+
     if org == 'HIV':
         resistance_mutations = parse_drm()
         write_sierra_results(rh, mut_file)
@@ -315,6 +317,7 @@ No HIV/HCV read found
         print(md, file=rh)
         return
 
+    write_run_info(rh)
     logging.info('Reading mutations from %s', mut_file)
     mutation_detected = pd.read_csv(mut_file)
     logging.info('shape: %s', mutation_detected.shape)

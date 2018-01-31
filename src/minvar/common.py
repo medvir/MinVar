@@ -123,3 +123,32 @@ org_dict = {
     }
 for k in hcv_map:
     org_dict[k] = 'HCV'
+
+# drug names
+drug_names = {
+    '3TC':  'lamivudine',
+    'ABC':  'abacavir',
+    'APV':  'amprenavir',
+    'ATV':  'atazanavir',
+    'd4T':  'stavudine',
+    'ddC':  'zalcitabine',
+    'ddI':  'didanosine',
+    'DLV':  'delavirdine',
+    'DRV':  'darunavir',
+    'EFV':  'efavirenz',
+    'ENF':  'enfuvirtide',
+    'ETR':  'etravirine',
+    'FPV':  'fosamprenavir',
+    'FTC':  'emtricitabine',
+    'IDV':  'indinavir',
+    'LPV':  'lopinavir',
+    'MVC':  'maraviroc',
+    'NFV':  'nelfinavir',
+    'NVP':  'nevirapine',
+    'RAL':  'raltegravir',
+    'RTV':  'ritonavir',
+    'SQV':  'saquinavir',
+    'TDF':  'tenofovir',
+    'TPV':  'tipranavir',
+    'ZDV':  'zidovudine'
+}
