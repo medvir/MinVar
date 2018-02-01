@@ -2,6 +2,7 @@
 """Parse the different output files and write a report in markdown, then convert it to pdf with markdown."""
 import sys
 import os
+import configparser
 import csv
 import logging
 import shlex
@@ -20,13 +21,16 @@ if __name__ == '__main__':
 else:
     from .common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, mastercomments_version
 
-# from common import acc_numbers, hcv_map
-
 # aminoacid one-letter code
 aa_set = set('GPAVLIMCFYWHKRQNEDST')
 
 # mutations below this threshold do not contribute to drug prediction via HIVdb
-sierra_threshold = 0.2
+runpars = configparser.ConfigParser()
+runpars.read(os.path.expanduser('~/.minvar/runpars.ini'))
+try:
+    sierra_threshold = float(runpars['sierra']['threshold'])
+except KeyError:
+    sierra_threshold = 0.2
 
 # colour cells according to susceptibility
 cell_colour = {
@@ -225,7 +229,7 @@ def parse_merged(mer_file):
 
 def write_contact_file(sample_id='unknown sample', version='unknown'):
     """Write tex file with contact information taken from ini file and sample_id in footer."""
-    import configparser
+
     config = configparser.ConfigParser()
     config.read(os.path.expanduser('~/.minvar/contact.ini'))
     try:
