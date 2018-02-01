@@ -29,6 +29,9 @@
 
 ### HIV
 
+- `masterComments` files were downloaded with `fetch_HIVdb_comments.py` and correspond
+  to *HIVdb version 8.4 (last updated 2017-06-16)*
+
 - `HIV1_CON_2002_genome_DNA[_aligned].fasta` (20 sequences) was downloaded from
   HIV LANL and contains the Consensus/Ancestral sequences, full genome, from all
   subtypes including recombinant form (alignment ID: 102CG1), aligned and raw

@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 
 ### Added
-- Subtype inference only reports top hit, subtype names are now clearer.
 - Cells of drug resistance report are colour coded.
 - The report includes levels of drug resistance inferred by [HIVdb](https://hivdb.stanford.edu/hivdb/by-mutations/).
+
+### Changed
+- Minor changes in final report.
+- `masterComments` files with DRMs lists are updated to version [8.4](https://hivdb.stanford.edu/page/algorithm-updates/)
+- Both full drug name and abbreviation are written.
+- Subtype inference only reports top hit, subtype names are now clearer.
+
 
 ## [v2.1.3] - 2017-01-18
 - Date added on every page of the report, major mutations are in bold.

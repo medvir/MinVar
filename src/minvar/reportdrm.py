@@ -16,9 +16,9 @@ if __name__ == '__main__':
         os.sys.path.insert(1, dn_dir)
         mod = __import__('minvar')
         sys.modules["minvar"] = mod
-        from common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names
+        from common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, mastercomments_version
 else:
-    from .common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names
+    from .common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, mastercomments_version
 
 # from common import acc_numbers, hcv_map
 
@@ -57,17 +57,7 @@ def parse_drm():
     HIVdb_comment_files = [resource_filename(__name__, 'db/HIV/masterComments_%s.txt' % p)
                            for p in ('PI', 'RTI', 'INI')]
     for gene, drm_file in zip(genes, HIVdb_comment_files):
-        # [('protease', 'masterComments_PI.txt'),
-        #                        ('RT', 'masterComments_RTI.txt'),
-        #                        ('integrase', 'masterComments_INI.txt')]:
-        # drm_file = os.path.join(db_dir, 'HIV', drm_file_name)
-        try:
-            d1 = pd.read_table(drm_file, header=0,
-                               names=['pos', 'mut', 'category', 'commented',
-                                      'comment'])
-        except pd.io.common.CParserError:  # integrase does not have commented column
-            d1 = pd.read_table(drm_file, header=0,
-                               names=['pos', 'mut', 'category', 'comment'])
+        d1 = pd.read_table(drm_file, header=0, names=['pos', 'mut', 'category', 'comment'])
         gs = pd.Series([gene] * len(d1))
         d1['gene'] = gs
         df_list.append(d1)
@@ -127,10 +117,10 @@ def write_sierra_results(handle, mut_file):
         h.write(ptn + '\n')
     cml = shlex.split('sierrapy patterns pattern.txt -o o.json')
     logging.debug(cml)
-    #subprocess.call(cml)
+    subprocess.call(cml)
     with open('o.json') as h:
         patterns = json.load(h)
-    #os.remove('o.json')
+    os.remove('o.json')
     os.remove('pattern.txt')
     assert len(patterns) == 1
     pattern = patterns[0]
@@ -333,7 +323,7 @@ No HIV/HCV read found
         logging.info('Shape of elaborated merged is: %s', str(drms.shape))
         # os.remove('merged_muts.csv')
 
-        drms.drop(['commented', 'mut_y'], axis=1, inplace=True)
+        # drms.drop(['commented', 'mut_y'], axis=1, inplace=True)
         drms.rename(columns={'mut_x': 'mut'}, inplace=True)
 
         cols = ['gene', 'pos', 'mut', 'freq', 'category']
@@ -344,6 +334,7 @@ No HIV/HCV read found
 
         print('Mutations detected', file=rh)
         print('==================\n', file=rh)
+        print('Mutation lists from %s.\n' % mastercomments_version, file=rh)
         # write_header_HIV(rh, resistance_mutations)
         for gene in ['protease', 'RT', 'integrase']:
             gene_muts = drms[drms.gene == gene]
