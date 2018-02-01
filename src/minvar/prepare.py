@@ -23,7 +23,7 @@ if __name__ == '__main__':
         from common import hcv_map, hiv_map, org_dict
         from stats import (genome_coverage, start_stop_coverage)
 else:
-    from .common import hcv_map, hiv_map, org_dict
+    from .common import hcv_map, hiv_map, org_dict, d2a, wobbles
     from .stats import (genome_coverage, start_stop_coverage)
 
 HCV_references = resource_filename(__name__, 'db/HCV/subtype_references.fasta')
@@ -46,8 +46,6 @@ except TypeError:
 def disambiguate(dna_string):
     """Removes ambiguous bases from a sequence"""
     from random import choice
-    d2a = {'AG': 'R', 'CT': 'Y', 'AC': 'M', 'GT': 'K', 'CG': 'S', 'AT': 'W'}
-    wobbles = {v: k for k, v in d2a.items()}
     out_seq = [s if s not in wobbles.keys() else choice(wobbles[s]) for s in dna_string]
     return ''.join(out_seq)
 

@@ -19,10 +19,10 @@ if __name__ == '__main__':
         os.sys.path.insert(1, dn_dir)
         mod = __import__('minvar')
         sys.modules["minvar"] = mod
-        from common import h77_map, consensus_B_map
+        from common import h77_map, consensus_B_map, d2a, wobbles
         from Alignment import needle_align, alignfile2dict
 else:
-    from .common import h77_map, consensus_B_map
+    from .common import h77_map, consensus_B_map, d2a, wobbles
     from .Alignment import needle_align, alignfile2dict
 
 
@@ -366,6 +366,26 @@ def df_2_sequence(df_in):
     if 'freq' in df_in.columns:
         max_freq_idx = df_in.groupby(['pos'])['freq'].transform(max) == df_in['freq']
         df_in = df_in[max_freq_idx]
+    # this is needed for positions where frequency is 0.5/0.5
+    df_in = df_in.groupby('pos').first().reset_index()
+    df_in = df_in.sort_values(by='pos', ascending=True)
+    # extract first nt in case of insertions
+    df_in['single_mut'] = df_in.apply(lambda row: row['mut'][0], axis=1)
+    return ''.join(df_in.single_mut.tolist())
+
+
+def df_2_ambiguous_sequence(df_in):
+    """Take a DataFrame with positions, nucleotides and frequencies and returns a sequence.
+
+    If the frequency is above a certain threshold, write the sequence with wobble bases.
+    """
+    # select row with max frequency for each position
+    assert 'freq' in df_in.columns
+    df_in = df_in[df_in['freq'] >= 0.15]
+    all_nt = df_in.groupby(['pos']).agg({'mut': lambda x: ''.join(sorted(x))})
+    all_nt['ambi'] = all_nt.apply(lambda row: d2a.get(row['mut'], row['mut']), axis=1)
+    return ''.join(all_nt.ambi.tolist())
+
     # this is needed for positions where frequency is 0.5/0.5
     df_in = df_in.groupby('pos').first().reset_index()
     df_in = df_in.sort_values(by='pos', ascending=True)

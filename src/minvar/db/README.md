@@ -24,9 +24,6 @@
   cons -sequence msa.fasta -outseq c.fasta -plurality 2 -setcase 1 -name HCV_CONSENSUS
   ```
 
-
-
-
 ### HIV
 
 - `masterComments` files were downloaded with `fetch_HIVdb_comments.py` and correspond

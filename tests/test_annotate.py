@@ -7,7 +7,7 @@ from Bio.Seq import Seq
 from Bio import SeqIO
 
 from src.minvar.annotate import (find_frame, merge_mutations, parsevar, compute_org_mutations, nt_freq_2_aa_freq,
-    df_2_sequence)
+                                 df_2_sequence, df_2_ambiguous_sequence)
 
 subtype1a = '''GCCAGCCCCCTGATGGGGGCGACACTCCACCATGAATCACTCCCCTGTGAGGAACTACTG\
 TCTTCACGCAGAAAGCGTCTAGCCATGGCGTTAGTATGAGTGTCGTGCAGCCTCCAGGAC\
@@ -178,3 +178,28 @@ def test_df_2_sequence():
         'mut': ['A', 'C', 'A', 'T']
         })
     assert df_2_sequence(m2) == 'ACT'
+
+def test_df_2_ambiguous_sequence():
+    import pandas as pd
+    # standard case
+    m = pd.DataFrame({
+        'pos': [1, 2, 2, 3],
+        'freq': [1.0, 0.55, 0.45, 1.0],
+        'mut': ['A', 'C', 'A', 'T']
+        })
+    assert df_2_ambiguous_sequence(m) == 'AMT'
+
+    # what happens when frequency is equally split?
+    m2 = pd.DataFrame({
+        'pos': [1, 2, 2, 3],
+        'freq': [1.0, 0.5, 0.5, 1.0],
+        'mut': ['A', 'C', 'A', 'T']
+        })
+    assert df_2_ambiguous_sequence(m2) == 'AMT'
+    # low frequency
+    m3 = pd.DataFrame({
+        'pos': [1, 2, 2, 3],
+        'freq': [1.0, 0.95, 0.05, 1.0],
+        'mut': ['A', 'C', 'A', 'T']
+        })
+    assert df_2_ambiguous_sequence(m3) == 'ACT'

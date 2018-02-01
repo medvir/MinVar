@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Definitions, lists, resources, used throughout the tool."""
 
+d2a = {'AG': 'R', 'CT': 'Y', 'AC': 'M', 'GT': 'K', 'CG': 'S', 'AT': 'W'}
+wobbles = {v: k for k, v in d2a.items()}
+
+
 MIN_FRACTION = 0.015
 RAW_DEPTH_THRESHOLD = 50
 

@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - The report includes levels of drug resistance inferred by [HIVdb](https://hivdb.stanford.edu/hivdb/by-mutations/).
 
 ### Changed
-- Threshold for sierra is read in the INI file `~/.minvar/runpars.ini`
+- Threshold for sierra is read from the INI file `~/.minvar/runpars.ini`
 - Minor changes in final report.
 - `masterComments` files with DRMs lists are updated to version [8.4](https://hivdb.stanford.edu/page/algorithm-updates/)
 - Both full drug name and abbreviation are written.
