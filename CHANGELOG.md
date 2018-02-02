@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 
 ### Added
+- Report now includes ambiguity score derived from ambiguous consensus sequence.
 - Consensus sequence with ambiguous bases is saved into `cns_ambiguous.fasta`.
 - Cells of drug resistance report are colour coded.
 - The report includes levels of drug resistance inferred by [HIVdb](https://hivdb.stanford.edu/hivdb/by-mutations/).
