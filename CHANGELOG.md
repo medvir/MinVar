@@ -7,10 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 
 ### Added
+- Consensus sequence with ambiguous bases is saved into `cns_ambiguous.fasta`.
 - Cells of drug resistance report are colour coded.
 - The report includes levels of drug resistance inferred by [HIVdb](https://hivdb.stanford.edu/hivdb/by-mutations/).
 
 ### Changed
+- Recombinant sequences are checked for also with HIV data.
 - Threshold for sierra is read from the INI file `~/.minvar/runpars.ini`
 - Minor changes in final report.
 - `masterComments` files with DRMs lists are updated to version [8.4](https://hivdb.stanford.edu/page/algorithm-updates/)

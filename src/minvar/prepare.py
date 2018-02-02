@@ -429,29 +429,35 @@ def main(read_file=None, max_n_reads=200000):
     logging.info('%s sequences detected', organism)
     max_support = max(support_freqs.values())
 
-    # check if there is better support for recombinant (HCV only)
+    # check if there is better support for recombinant
     max_support_rec = 0.0
-    if organism == 'HCV':
-        # if support is good, don't even try recombinants
-        if max_support < 0.85:
-            logging.info('Low support in HCV: try recombinant')
-            organism, rec_support_freqs, rec_acc = find_subtype(filtered_file, recomb=True)
-            max_support_rec = max(rec_support_freqs.values())
-        # max_support_rec is 0.0, unless explicitely computed
-        if max_support_rec > max_support:
-            logging.info('Using recombinant')
+
+    # if support is good, don't even try recombinants
+    if max_support < 0.5:
+        logging.info('Low support in HCV: try recombinant')
+        organism, rec_support_freqs, rec_acc = find_subtype(filtered_file, recomb=True)
+        max_support_rec = max(rec_support_freqs.values())
+    # max_support_rec is 0.0, unless explicitely computed
+    if max_support_rec > max_support and max_support_rec > 0.5:
+        logging.info('Using recombinant')
+        if organism == 'HIV':
+            sub_file = HIV_recomb_references
+        elif organism == 'HCV':
             sub_file = HCV_recomb_references
-            frequencies = rec_support_freqs
-            s_id = rec_acc
-        elif max_support_rec <= max_support:
-            logging.info('Using non recombinant')
+        frequencies = rec_support_freqs
+        s_id = rec_acc
+    else:
+        logging.info('Using non recombinant')
+        if organism == 'HIV':
+            sub_file = HIV_references
+        elif organism == 'HCV':
             sub_file = HCV_references
-            frequencies = support_freqs
-            s_id = acc
-    elif organism == 'HIV':
-        sub_file = HIV_references
         frequencies = support_freqs
         s_id = acc
+    # elif organism == 'HIV':
+    #     sub_file = HIV_references
+    #     frequencies = support_freqs
+    #     s_id = acc
 
     sorted_freqs = sorted(frequencies, key=frequencies.get, reverse=True)
     best_subtype = sorted_freqs[0]
