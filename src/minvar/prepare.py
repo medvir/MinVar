@@ -20,10 +20,10 @@ if __name__ == '__main__':
         os.sys.path.insert(1, dn_dir)
         mod = __import__('minvar')
         sys.modules["minvar"] = mod
-        from common import hcv_map, hiv_map, org_dict, d2a, wobbles
+        from common import hcv_map, hiv_map, org_dict, wobbles
         from stats import (genome_coverage, start_stop_coverage)
 else:
-    from .common import hcv_map, hiv_map, org_dict, d2a, wobbles
+    from .common import hcv_map, hiv_map, org_dict, wobbles
     from .stats import (genome_coverage, start_stop_coverage)
 
 HCV_references = resource_filename(__name__, 'db/HCV/subtype_references.fasta')
@@ -93,6 +93,7 @@ def filter_reads(filename, max_n, min_len=49):
 def find_subtype(reads_file, sampled_reads=1000, recomb=False):
     """Blast a subset of reads against references to infer organism and support for group/subtype."""
     import fileinput
+    import warnings
     import pandas as pd
 
     if recomb:
@@ -151,6 +152,9 @@ def find_subtype(reads_file, sampled_reads=1000, recomb=False):
             freqs[m] += 1. / (queries * len(matching))
             support[org_dict[m.split('.')[0]]] += 1. / len(matching)
 
+    if support['HIV'] and support['HCV']:
+        logging.warning('Found both HIV and HCV reads (support %f and %f)', support['HIV'], support['HCV'])
+        warnings.warn('Both HIV and HCV reads were found.')
     max_freq = max(freqs.values())
     organism_here = max(support, key=support.get)
     freq2 = {}
@@ -439,7 +443,6 @@ def main(read_file=None, max_n_reads=200000):
         max_support_rec = max(rec_support_freqs.values())
     # max_support_rec is 0.0, unless explicitely computed
     if max_support_rec > max_support:
-        print('recombinant!')
         logging.info('Using recombinant')
         if organism == 'HIV':
             sub_file = HIV_recomb_references
@@ -455,10 +458,6 @@ def main(read_file=None, max_n_reads=200000):
             sub_file = HCV_references
         frequencies = support_freqs
         s_id = acc
-    # elif organism == 'HIV':
-    #     sub_file = HIV_references
-    #     frequencies = support_freqs
-    #     s_id = acc
 
     sorted_freqs = sorted(frequencies, key=frequencies.get, reverse=True)
     best_subtype = sorted_freqs[0]
