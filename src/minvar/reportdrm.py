@@ -8,6 +8,7 @@ import logging
 import shlex
 import subprocess
 from pkg_resources import resource_filename
+from Bio import SeqIO
 
 import pandas as pd
 
@@ -168,6 +169,17 @@ def write_sierra_results(handle, mut_file):
             # assert len(partial['mutations']) == 1, partial['mutations']
     print('\\newpage', file=handle)
 
+
+def write_ambig_score(handle):
+    """Read ambiguous sequence, compute and write ambiguity score."""
+
+    ambi = list(SeqIO.parse('cns_ambiguous.fasta', 'fasta'))[0].seq
+    ambi = str(ambi).replace('N', '')
+    ambi_score = float(sum((1 for nt in ambi if not nt in set(['A', 'C', 'G', 'T']))))
+    ambi_score /= len(ambi)
+    ambi_score *= 100
+    print('\nAmbiguity score: %3.1f %%' % ambi_score, file=handle)
+    print('------------------------\n', file=handle)
 
 def write_header_HIV(handle, drms=None):
     """Write header to a file in markdown format."""
@@ -411,6 +423,7 @@ No HIV/HCV read found
                     file=rh)
                 del index
             print('\n', file=rh)
+    write_ambig_score(rh)
     rh.close()
 
 
