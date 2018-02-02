@@ -97,7 +97,7 @@ def write_subtype_info(handle, subtype_file=None):
             md_header += 'Inferred subtype: %s (blast support: %d %%)\n' % (top_gt, support)
             md_header += '-----------------------------------------\n'
         else:
-            md_header += 'Subtype not inferred: (blast support too low)\n'
+            md_header += 'Undetermined subtype: (blast support below 50%)\n'
             md_header += '---------------------------------------------\n'
 
     except FileNotFoundError:

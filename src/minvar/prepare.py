@@ -20,7 +20,7 @@ if __name__ == '__main__':
         os.sys.path.insert(1, dn_dir)
         mod = __import__('minvar')
         sys.modules["minvar"] = mod
-        from common import hcv_map, hiv_map, org_dict
+        from common import hcv_map, hiv_map, org_dict, d2a, wobbles
         from stats import (genome_coverage, start_stop_coverage)
 else:
     from .common import hcv_map, hiv_map, org_dict, d2a, wobbles
@@ -434,11 +434,12 @@ def main(read_file=None, max_n_reads=200000):
 
     # if support is good, don't even try recombinants
     if max_support < 0.5:
-        logging.info('Low support in HCV: try recombinant')
+        logging.info('Low support in blast: try recombinant')
         organism, rec_support_freqs, rec_acc = find_subtype(filtered_file, recomb=True)
         max_support_rec = max(rec_support_freqs.values())
     # max_support_rec is 0.0, unless explicitely computed
-    if max_support_rec > max_support and max_support_rec > 0.5:
+    if max_support_rec > max_support:
+        print('recombinant!')
         logging.info('Using recombinant')
         if organism == 'HIV':
             sub_file = HIV_recomb_references
