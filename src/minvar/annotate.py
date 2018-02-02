@@ -374,24 +374,31 @@ def df_2_sequence(df_in):
     return ''.join(df_in.single_mut.tolist())
 
 
-def df_2_ambiguous_sequence(df_in):
+def df_2_ambiguous_sequence(df_in, cov_df=None, coverage_threshold=100):
     """Take a DataFrame with positions, nucleotides and frequencies and returns a sequence.
 
     If the frequency is above a certain threshold, write the sequence with wobble bases.
     """
-    # select row with max frequency for each position
     assert 'freq' in df_in.columns
+    # select calls with freq > 15%
     df_in = df_in[df_in['freq'] >= 0.15]
+    # aggregate calls for the same position
     all_nt = df_in.groupby(['pos']).agg({'mut': lambda x: ''.join(sorted(x))})
-    all_nt['ambi'] = all_nt.apply(lambda row: d2a.get(row['mut'], row['mut']), axis=1)
-    return ''.join(all_nt.ambi.tolist())
+    # create a columng of ambiguous bases
+    all_nt['ambi'] = all_nt.apply(lambda row: d2a.get(row['mut'], row['mut'][0]), axis=1)
+    all_nt.reset_index(inplace=True)
+    if not cov_df is None:
+        full_df = pd.merge(all_nt, cov_df, on='pos', how='left')
+        full_df.loc[full_df['coverage'] < coverage_threshold, 'ambi'] = 'N'
+    return ''.join(full_df.ambi.tolist())
 
-    # this is needed for positions where frequency is 0.5/0.5
-    df_in = df_in.groupby('pos').first().reset_index()
-    df_in = df_in.sort_values(by='pos', ascending=True)
-    # extract first nt in case of insertions
-    df_in['single_mut'] = df_in.apply(lambda row: row['mut'][0], axis=1)
-    return ''.join(df_in.single_mut.tolist())
+
+def get_coverage(sorted_bam_file):
+    """Run samtools depth and read the result in a pandas DataFrame."""
+    cml = shlex.split('samtools depth -a %s' % sorted_bam_file)
+    proc = subprocess.Popen(cml, stdout=subprocess.PIPE)
+    cov_df = pd.read_csv(proc.stdout, sep='\t', header=None, names=['ref', 'pos', 'coverage'])
+    return cov_df
 
 
 def nt_freq_2_aa_freq(df_nt, frame, bam_file=None):
@@ -489,6 +496,12 @@ def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_fi
     merged = merge_mutations(cns_variants_nt, vcf_mutations)
     # merged contains three columns: variant, frequency and position of the sample consensus
     merged.to_csv('merged_mutations_nt.csv', index=False, float_format='%6.4f')
+
+    coverage_df = get_coverage(bam_file)
+    logging.info('save consensus sequence with wobbles to file')
+    ambi_cns = Seq(df_2_ambiguous_sequence(merged, coverage_df))
+    assert len(ambi_cns) == len(ref_nt), '%d - %d' % (len(ambi_cns), len(ref_nt))
+    SeqIO.write(SeqRecord(ambi_cns, id='ambiguous_consensus', description=''), 'cns_ambiguous.fasta', 'fasta')
 
     logging.info('save max frequency sequence to file')
     # generally slightly different from consensus reference
