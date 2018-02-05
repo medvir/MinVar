@@ -18,9 +18,9 @@ if __name__ == '__main__':
         os.sys.path.insert(1, dn_dir)
         mod = __import__('minvar')
         sys.modules["minvar"] = mod
-        from common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, mastercomments_version
+        from common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, mastercomments_version, coverage_threshold
 else:
-    from .common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, mastercomments_version
+    from .common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, mastercomments_version, coverage_threshold
 
 # aminoacid one-letter code
 aa_set = set('GPAVLIMCFYWHKRQNEDST')
@@ -81,10 +81,8 @@ def parse_ras():
 def write_subtype_info(handle, subtype_file=None):
     """Write information on subtyping."""
     from operator import itemgetter
+
     try:
-    #if os.path.exists(subtype_file):
-        md_header = 'Drug resistance mutations detected by NGS sequencing'
-        md_header += '\n' + '=' * len(md_header) + '\n\n'
         save_freq = {}
         with open(subtype_file) as csvfile:
             spamreader = csv.reader(csvfile, delimiter=',')
@@ -94,20 +92,20 @@ def write_subtype_info(handle, subtype_file=None):
                     save_freq[mtype] = save_freq.get(mtype, 0) + int_freq
         top_gt, support = sorted(save_freq.items(), key=itemgetter(1), reverse=True)[0]
         if support >= 50:
-            md_header += 'Inferred subtype: %s (blast support: %d %%)\n' % (top_gt, support)
-            md_header += '-----------------------------------------\n'
+            md_header = 'Subtype with the highest blast support: %s (%d %%)\n' % (top_gt, support)
+            md_header += '-------------------------------------------------\n'
         else:
-            md_header += 'Undetermined subtype: (blast support below 50%)\n'
+            md_header = 'Undetermined subtype: (blast support below 50%)\n'
             md_header += '---------------------------------------------\n'
-
     except FileNotFoundError:
         md_header = '\n'
     print(md_header, file=handle)
 
+
 def write_sierra_results(handle, mut_file):
     """Run sierrapy patterns results."""
-
     import json
+
     mutations = pd.read_csv(mut_file)
     mutations = mutations[mutations['freq'] >= sierra_threshold]
     mutations = mutations[mutations['gene'] != 'GagPolTF']
@@ -131,7 +129,7 @@ def write_sierra_results(handle, mut_file):
     pattern = patterns[0]
     version = pattern['drugResistance'][0]['version']['text']
     pubdate = pattern['drugResistance'][0]['version']['publishDate']
-    print('Drug Resistance Interpretation', file=handle)
+    print('Drug resistance interpretation', file=handle)
     print('==============================\n', file=handle)
     print('Stanford HIVdb version %s, pubdate %s.' % (version, pubdate), file=handle)
     print('Mutations below %d%% were not included.\n' % (100 * sierra_threshold), file=handle)
@@ -141,7 +139,7 @@ def write_sierra_results(handle, mut_file):
         comments_set = set()
         print(gmap_inverse.get(gene_name, gene_name), file=handle)
         print('-' * len(gene_name) + '\n', file=handle)
-        print('| class |         name         | score|      assessment      |               mutations                |',
+        print('| class |         name         | score|      assessment      |              mutations               |',
               file=handle)
         print('|:{:-^5}:|:{:-^20}:| {:-^4}:|:{:-^20}:|:{:-^39}|'.format('', '', '', '', ''), file=handle)
 
@@ -163,27 +161,29 @@ def write_sierra_results(handle, mut_file):
             print('- %s' % cm, file=handle)
 
         print('', file=handle)
-            # for partial in drugscore['partialScores']:
-            #  if len(partial['mutations']) > 1:
-            #      pprint(partial)
-            # assert len(partial['mutations']) == 1, partial['mutations']
+        # for partial in drugscore['partialScores']:
+        #  if len(partial['mutations']) > 1:
+        #      pprint(partial)
+        # assert len(partial['mutations']) == 1, partial['mutations']
     print('\\newpage', file=handle)
 
 
 def write_ambig_score(handle):
     """Read ambiguous sequence, compute and write ambiguity score."""
-
+    print('\nAmbiguity score', file=handle)
+    print('---------------\n', file=handle)
     ambi = list(SeqIO.parse('cns_ambiguous.fasta', 'fasta'))[0].seq
-    ambi = str(ambi).replace('N', '')
-    ambi_score = float(sum((1 for nt in ambi if not nt in set(['A', 'C', 'G', 'T']))))
-    ambi_score /= len(ambi)
-    ambi_score *= 100
-    print('\nAmbiguity score: %3.1f %%' % ambi_score, file=handle)
-    print('------------------------\n', file=handle)
+    ambi_regions = str(ambi).split('N')
+    ambi_regions = [s for s in ambi_regions if len(s)]
+    print('Computed on regions of coverage higher than %d.\n' % coverage_threshold, file=handle)
+    for ambi_region in ambi_regions:
+        score = float(sum((1 for nt in ambi_region if nt not in set(['A', 'C', 'G', 'T']))))
+        rlen = len(ambi_region)
+        print('- score: %4.2f %% (%d of %d total nucleotides)' % (100 * score / rlen, score, rlen), file=handle)
+
 
 def write_header_HIV(handle, drms=None):
     """Write header to a file in markdown format."""
-
     md_header = """\
 Parsing mutations
 -----------------
@@ -199,7 +199,6 @@ The list of annotated mutations was downloaded from HIVdb and includes:
 
 def write_header_HCV(handle, drms=None):
     """Write header to a file in markdown format."""
-
     md_header = """
 
 Parsing mutations
@@ -241,7 +240,6 @@ def parse_merged(mer_file):
 
 def write_contact_file(sample_id='unknown sample', version='unknown'):
     """Write tex file with contact information taken from ini file and sample_id in footer."""
-
     config = configparser.ConfigParser()
     config.read(os.path.expanduser('~/.minvar/contact.ini'))
     try:
@@ -264,7 +262,6 @@ def write_contact_file(sample_id='unknown sample', version='unknown'):
     oh.write(r'\hfill' + '\n')
     oh.write(r'\begin{minipage}{0.45\textwidth}' + '\n')
     oh.write(r'\begin{tabular}{@{}r@{}}' + '\n')
-    #oh.write(r'\today \\[\normalbaselineskip]' + '\n')
     oh.write(r'%s\\' % contact_dict['unit'] + '\n')
     oh.write(r'phone: %s\\' % contact_dict['phone'] + '\n')
     oh.write(r'fax: %s\\' % contact_dict['fax'] + '\n')
@@ -273,21 +270,21 @@ def write_contact_file(sample_id='unknown sample', version='unknown'):
     oh.write(r'\end{minipage}' + '\n')
     oh.write(r'\vspace{1cm}' + '\n')
 
-    r"""\fancyfoot[L]{John Smith \quad - \quad \href{mailto:john@smith.com}{{\small john@smith.com}}}
-
-    \begin{minipage}{0.5\textwidth}
-      \includegraphics[width=2in]{uzh_logo_e_pos}% Logo
-    \end{minipage}
-    \hfill
-    \begin{minipage}{0.45\textwidth}
-    \begin{tabular}{@{}r@{}}
-      %\DTMnow \\[\normalbaselineskip]
-      Institute of Medical Virology \\
-      Telephone + 41 44 63 42653  \\
-      Fax + 41 44 63 44967 \\
-      Email \href{mailto:med-virology@virology.uzh.ch}{med-virology@virology.uzh.ch}
-    \end{tabular}
-    \end{minipage}"""
+    # r"""\fancyfoot[L]{John Smith \quad - \quad \href{mailto:john@smith.com}{{\small john@smith.com}}}
+    #
+    # \begin{minipage}{0.5\textwidth}
+    #   \includegraphics[width=2in]{uzh_logo_e_pos}% Logo
+    # \end{minipage}
+    # \hfill
+    # \begin{minipage}{0.45\textwidth}
+    # \begin{tabular}{@{}r@{}}
+    #   %\DTMnow \\[\normalbaselineskip]
+    #   Institute of Medical Virology \\
+    #   Telephone + 41 44 63 42653  \\
+    #   Fax + 41 44 63 44967 \\
+    #   Email \href{mailto:med-virology@virology.uzh.ch}{med-virology@virology.uzh.ch}
+    # \end{tabular}
+    # \end{minipage}"""
 
 
 def write_run_info(handle):
@@ -297,16 +294,22 @@ def write_run_info(handle):
 Run information
 ---------------
 
-Mutations at single nucleotide positions were called with a %4.1f%% frequency threshold and a minimum depth of %d reads.
+Mutations at single nucleotide positions were called with a %4.1f%% frequency
+threshold and a minimum depth of %d reads.
 
 """ % (100 * MIN_FRACTION, RAW_DEPTH_THRESHOLD)
     print(run_info, file=handle)
 
 
-def write_md(org=None, mut_file='final.csv', subtype_file='subtype_evidence.csv'):
+def write_md(org=None, mut_file='final.csv', subtype_file='subtype_evidence.csv', sample_id=''):
     """Write the markdown file."""
     logging.info('Writing report in markdown')
     rh = open('report.md', 'w')
+    print('Sample %s: drug resistance mutations report' % sample_id, file=rh)
+    print('============================================\n', file=rh)
+    # print('Drug resistance mutations detected by NGS sequencing', file=rh)
+    # print('====================================================\n', file=rh)
+
     write_subtype_info(rh, subtype_file)
 
     if org == 'HIV':
@@ -314,7 +317,7 @@ def write_md(org=None, mut_file='final.csv', subtype_file='subtype_evidence.csv'
         write_sierra_results(rh, mut_file)
     elif org == 'HCV':
         resistance_mutations = parse_ras()
-        write_header_HCV(rh, resistance_mutations)
+        # write_header_HCV(rh, resistance_mutations)
     elif org is None:
         md = """
 No HIV/HCV read found
@@ -323,7 +326,6 @@ No HIV/HCV read found
         print(md, file=rh)
         return
 
-    write_run_info(rh)
     logging.info('Reading mutations from %s', mut_file)
     mutation_detected = pd.read_csv(mut_file)
     logging.info('shape: %s', mutation_detected.shape)
@@ -333,6 +335,8 @@ No HIV/HCV read found
     mpd.to_csv(path_or_buf='merged_muts_drm_annotated.csv', index=False)
     logging.info('Shape of raw merged is: %s', str(mpd.shape))
 
+    print('Mutations detected', file=rh)
+    print('==================\n', file=rh)
     if org == 'HIV':
         # too complicated with panda, do it by hand
         drms = parse_merged('merged_muts_drm_annotated.csv')
@@ -348,9 +352,8 @@ No HIV/HCV read found
                          ascending=[True, True, False])
         drms.to_csv('annotated_DRM.csv', index=False)
 
-        print('Mutations detected', file=rh)
-        print('==================\n', file=rh)
         print('Mutation lists from %s.\n' % mastercomments_version, file=rh)
+        write_run_info(rh)
         # write_header_HIV(rh, resistance_mutations)
         for gene in ['protease', 'RT', 'integrase']:
             gene_muts = drms[drms.gene == gene]
@@ -381,13 +384,12 @@ No HIV/HCV read found
                 else:
                     mut_cat = row['category']
                 print(
-                    '|{: ^10}|{: ^10}|{: ^15}|{: ^20}|'.format(int(row['pos']),
-                                                               row['mut'],
-                                                               int_freq,
-                                                               mut_cat),
+                    '|{: ^10}|{: ^10}|{: ^15}|{: ^20}|'.format(int(row['pos']), row['mut'], int_freq, mut_cat),
                     file=rh)
             print('\n', file=rh)
     elif org == 'HCV':
+        write_header_HCV(rh, resistance_mutations)
+        write_run_info(rh)
         drms = pd.read_csv('merged_muts_drm_annotated.csv')
         drms = drms.fillna("unknown")
         drms = drms[drms['CATEGORY'] == 'RAS']
@@ -427,19 +429,14 @@ No HIV/HCV read found
     rh.close()
 
 
-def convert_2_pdf(fastq=None, version='unknown'):
+def convert_2_pdf(sample_id='', version='unknown'):
     """Convert markdown file to pdf with pandoc, filling sample and version info."""
     import shutil
-    import re
+
     # copy template to current directory
     tmpl_file = resource_filename(__name__, 'db/template.tex')
     shutil.copy(tmpl_file, os.getcwd())
     # write contact.tex to be included in template
-    fastq_base = os.path.basename(fastq)
-    try:
-        sample_id = re.search(r'(.*)_S\d*', fastq_base).group(1)
-    except AttributeError:
-        sample_id = 'unknown'
     write_contact_file(sample_id=sample_id, version=version)
     logging.info('Converting markdown to pdf with pandoc')
     pand_cml = 'pandoc --template=./template.tex report.md -o report.pdf'
@@ -451,10 +448,17 @@ def convert_2_pdf(fastq=None, version='unknown'):
 
 def main(org=None, subtype_file=None, fastq='unknown', version='unknown'):
     """What the main does."""
-    write_md(org=org, mut_file='final.csv', subtype_file=subtype_file)
-    convert_2_pdf(fastq=fastq, version=version)
+    import re
+
+    fastq_base = os.path.basename(fastq)
+    try:
+        sample_id = re.search(r'(.*)_S\d*', fastq_base).group(1)
+    except AttributeError:
+        sample_id = 'unknown'
+    write_md(org=org, mut_file='final.csv', subtype_file=subtype_file, sample_id=sample_id)
+    convert_2_pdf(sample_id=sample_id, version=version)
 
 
 if __name__ == '__main__':
-    #write_sierra_results(sys.stdout, 'final.csv')
+    # write_sierra_results(sys.stdout, 'final.csv')
     main(org=sys.argv[1], subtype_file='subtype_evidence.csv')

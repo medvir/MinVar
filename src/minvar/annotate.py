@@ -19,10 +19,10 @@ if __name__ == '__main__':
         os.sys.path.insert(1, dn_dir)
         mod = __import__('minvar')
         sys.modules["minvar"] = mod
-        from common import h77_map, consensus_B_map, d2a, wobbles
+        from common import h77_map, consensus_B_map, d2a, coverage_threshold
         from Alignment import needle_align, alignfile2dict
 else:
-    from .common import h77_map, consensus_B_map, d2a, wobbles
+    from .common import h77_map, consensus_B_map, d2a, coverage_threshold
     from .Alignment import needle_align, alignfile2dict
 
 
@@ -374,7 +374,7 @@ def df_2_sequence(df_in):
     return ''.join(df_in.single_mut.tolist())
 
 
-def df_2_ambiguous_sequence(df_in, cov_df=None, coverage_threshold=100):
+def df_2_ambiguous_sequence(df_in, cov_df=None):
     """Take a DataFrame with positions, nucleotides and frequencies and returns a sequence.
 
     If the frequency is above a certain threshold, write the sequence with wobble bases.

@@ -5,9 +5,9 @@ d2a = {'AG': 'R', 'CT': 'Y', 'AC': 'M', 'GT': 'K', 'CG': 'S', 'AT': 'W',
        'ACT': 'H', 'CGT': 'B', 'ACG': 'V', 'AGT': 'D', 'ACGT': 'N'}
 wobbles = {v: k for k, v in d2a.items()}
 
-
 MIN_FRACTION = 0.015
 RAW_DEPTH_THRESHOLD = 50
+coverage_threshold = 100
 
 # This must be updated when new masterComments files are downloaded into src/minvar/db/HIV
 mastercomments_version = 'HIVdb version 8.4 (last updated 2017-06-16)'
