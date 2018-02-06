@@ -152,9 +152,14 @@ def find_subtype(reads_file, sampled_reads=1000, recomb=False):
             freqs[m] += 1. / (queries * len(matching))
             support[org_dict[m.split('.')[0]]] += 1. / len(matching)
 
-    if support['HIV'] and support['HCV']:
+    if support['HIV'] and support['HCV'] and support['HIV'] != support['HCV']:
         logging.warning('Found both HIV and HCV reads (support %f and %f)', support['HIV'], support['HCV'])
         warnings.warn('Both HIV and HCV reads were found.')
+    elif support['HIV'] and support['HCV'] and support['HIV'] == support['HCV']:
+        logging.error('Found both HIV and HCV reads (support %f and %f)', support['HIV'], support['HCV'])
+        logging.error('HIV and HCV in similar amount, impossible to continue, exiting')
+        sys.exit()
+
     max_freq = max(freqs.values())
     organism_here = max(support, key=support.get)
     freq2 = {}
