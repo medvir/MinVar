@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 setup(
     use_scm_version=True,
-    setup_requires=['setuptools_scm', 'setuptools_scm_git_archive', 'pytest-runner'],
+    setup_requires=['setuptools_scm', 'setuptools_scm_git_archive'],
     install_requires=['setuptools_scm'],
     tests_require=['pytest', 'flake8'],
     name='MinVar',
@@ -14,7 +14,6 @@ setup(
     author_email='firstname.lastname@gmail.com',
     packages=find_packages('src'),  # include all packages under src
     package_dir={'': 'src'},  # tell setuptools packages are under src
-    # scripts=['bin/minvar', 'src/scripts/blast2sam.py'],
     package_data={'minvar': ['db/HIV/*', 'db/HCV/*', 'db/template.tex']},
     entry_points={
         'console_scripts': ['minvar = minvar.cli:main',
@@ -25,7 +24,7 @@ setup(
         #   3 - Alpha
         #   4 - Beta
         #   5 - Production/Stable
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
 
         # Indicate who your project is intended for
         'Intended Audience :: Developers',
@@ -43,5 +42,6 @@ setup(
         # 'Programming Language :: Python :: 3',
         # 'Programming Language :: Python :: 3.2',
         # 'Programming Language :: Python :: 3.3',
-        'Programming Language :: Python :: 3.5']
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6']
 )
