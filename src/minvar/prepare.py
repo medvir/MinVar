@@ -33,7 +33,6 @@ HCV_recomb_references = \
 HIV_recomb_references = \
     resource_filename(__name__, 'db/HIV/recomb_references.fasta')
 blast2sam_exe = 'blast2sam'
-HIV_amp = resource_filename(__name__, 'db/HIV/consensus_B.fna')
 
 qual_thresh = 20
 

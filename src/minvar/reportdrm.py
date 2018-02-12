@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
-"""Parse the different output files and write a report in markdown, then convert it to pdf with markdown."""
+"""
+
+Make report with Drug Resistance Mutations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Parse the different output files and write a report in markdown, then convert it to pdf with pandoc.
+
+This could be improved by writing pure functions that return strings of markdown formatted text and
+letting the main orchestrate the composition of paragraphs.
+
+"""
 import sys
 import os
 import configparser
@@ -8,7 +18,7 @@ import logging
 import shlex
 import subprocess
 from pkg_resources import resource_filename
-from Bio import SeqIO
+from Bio import SeqIO, AlignIO
 
 import pandas as pd
 
@@ -18,9 +28,13 @@ if __name__ == '__main__':
         os.sys.path.insert(1, dn_dir)
         mod = __import__('minvar')
         sys.modules["minvar"] = mod
-        from common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, mastercomments_version, coverage_threshold
+        from common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, mastercomments_version
+        from Alignment import needle_align
 else:
-    from .common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, mastercomments_version, coverage_threshold
+    from .common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, mastercomments_version
+    from .Alignment import needle_align
+
+cons_B_file = resource_filename(__name__, 'db/HIV/consensus_B.fna')
 
 # aminoacid one-letter code
 aa_set = set('GPAVLIMCFYWHKRQNEDST')
@@ -56,7 +70,7 @@ cell_colour = {
 
 
 def parse_drm():
-    """Parse drug resistance mutations listed in files db/HIV/masterComments*.txt."""
+    """Return drug resistance mutations listed in files db/HIV/masterComments*.txt."""
     df_list = []
     genes = ['protease', 'RT', 'integrase']
     HIVdb_comment_files = [resource_filename(__name__, 'db/HIV/masterComments_%s.txt' % p)
@@ -71,7 +85,7 @@ def parse_drm():
 
 
 def parse_ras():
-    """Parse position of RAS listed in file db/HCV/all_mutations_position.csv."""
+    """Return position of RAS listed in file db/HCV/all_mutations_position.csv."""
     ras_file = resource_filename(__name__, 'db/HCV/all_mutations_position.csv')
     ras_positions = pd.read_csv(ras_file)
     ras_positions['CATEGORY'] = 'RAS'
@@ -79,7 +93,14 @@ def parse_ras():
 
 
 def write_subtype_info(handle, subtype_file=None):
-    """Write information on subtyping."""
+    """If a subtype evidence file is present, write information on subtyping in markdown into ``handle``.
+
+    Reads the support given to each subtype/genotype in ``subtype_file``. If the highest support
+    is < 50%% then writes "Undetermined"
+
+    :param subtype_file: path to csv file with subtype,reads columns
+    :param handle: handle of markdown file being written
+    """
     from operator import itemgetter
 
     try:
@@ -103,7 +124,20 @@ def write_subtype_info(handle, subtype_file=None):
 
 
 def write_sierra_results(handle, mut_file):
-    """Run sierrapy patterns results."""
+    """Run ``sierrapy patterns``, parse the results and writes them into ``handle``.
+
+    Read mutations from ``mut_file`` and write only those above ``sierra_threshold`` them into a format that can be
+    read with ``sierrapy patterns``.
+    Then, read the resulting json and write it with the correct markdown formatting into ``handle``. This
+    markdown also includes some latex to colour the table cells according to the resistance.
+
+    This is only run on HIV samples. See `sierrapy page
+    <https://github.com/hivdb/sierra-client/tree/master/python>`_ for more info.
+
+    :param mut_file: path to csv file with gene,freq,wt,mut columns
+    :param handle: handle of markdown file being written
+
+    """
     import json
 
     mutations = pd.read_csv(mut_file)
@@ -169,36 +203,53 @@ def write_sierra_results(handle, mut_file):
 
 
 def write_ambig_score(handle):
-    """Read ambiguous sequence, compute and write ambiguity score."""
+    """Read ambiguous sequence, compute and write ambiguity score to handle.
+
+    Read the sequence from ``cns_ambiguous.fasta``, align it to PRRT up to amminoacid 335, extract
+    the aligned region and count the total and ambiguous nucleotides (*i.e.*, not ACGT).
+
+    :param handle: handle of markdown file being written
+    """
     print('\nAmbiguity score', file=handle)
     print('---------------\n', file=handle)
-    ambi = list(SeqIO.parse('cns_ambiguous.fasta', 'fasta'))[0].seq
-    ambi_regions = str(ambi).split('N')
-    ambi_regions = [s for s in ambi_regions if len(s)]
-    print('Computed on regions of coverage higher than %d.\n' % coverage_threshold, file=handle)
-    for ambi_region in ambi_regions:
-        score = float(sum((1 for nt in ambi_region if nt not in set(['A', 'C', 'G', 'T']))))
-        rlen = len(ambi_region)
-        print('- score: %4.2f %% (%d of %d total nucleotides)' % (100 * score / rlen, score, rlen), file=handle)
+    amb_target = str(list(SeqIO.parse(cons_B_file, 'fasta'))[0].seq[168:1470])
+    needle_align('cns_ambiguous.fasta', 'asis:%s'% amb_target, 'ambi_aln.fasta', go=10., ge=.5)
+    alignment = AlignIO.read('ambi_aln.fasta', 'fasta')
+    start = None
+    i = 0
+    while start is None:
+        if '-' not in alignment[:, i]:
+            start = i
+        i += 1
+    ambi_al, cons_al = str(alignment[0].seq), str(alignment[1].seq)
+    stop = min(len(cons_al.rstrip('-')), len(ambi_al.rstrip('-')))
+    target = ambi_al[start:stop].replace('-', '').replace('N', '')
+    rlen = len(target)
+    score = float(sum((1 for nt in target if nt not in set(['A', 'C', 'G', 'T']))))
+    print('Score: %4.2f %% (%d of %d total nucleotides).\n\n' % (100 * score / rlen, score, rlen), file=handle)
+    print('Region to compute ambiguity score is 1302 bp, reached high coverage on %d.\n\n' % rlen, file=handle)
 
-
-def write_header_HIV(handle, drms=None):
-    """Write header to a file in markdown format."""
-    md_header = """\
-Parsing mutations
------------------
-
-The list of annotated mutations was downloaded from HIVdb and includes:
-
-"""
-    for gene in ['protease', 'RT', 'integrase']:
-        positions = set(drms[drms.gene == gene].pos.tolist())
-        md_header += '- %d positions on %s\n' % (len(positions), gene)
-    print(md_header, file=handle)
+# def write_header_HIV(handle, drms=None):
+#     """Write header to a file in markdown format."""
+#     md_header = """\
+# Parsing mutations
+# -----------------
+#
+# The list of annotated mutations was downloaded from HIVdb and includes:
+#
+# """
+#     for gene in ['protease', 'RT', 'integrase']:
+#         positions = set(drms[drms.gene == gene].pos.tolist())
+#         md_header += '- %d positions on %s\n' % (len(positions), gene)
+#     print(md_header, file=handle)
 
 
 def write_header_HCV(handle, drms=None):
-    """Write header to a file in markdown format."""
+    """Write header with the count of known RAS to a file in markdown format (HCV only).
+
+    :param handle: handle of markdown file being written
+    :param drms: dataframe with known RAS mutation on each gene, colums: |gene|pos|
+    """
     md_header = """
 
 Parsing mutations
@@ -221,7 +272,12 @@ def aa_unpack(mut_string):
 
 
 def parse_merged(mer_file):
-    """Do this by hand because it was too complicated to achieve this functionality with panda alone."""
+    """OUTDATED: manual conversion of mutations extracted from HIVdb comment files.
+
+    In older versions, comment files contained information with NOT XYZ to signify
+    all aminoacids except X, Y, and Z. This function translated this into a list of
+    valid ammino acids. It was too complicated to achieve this functionality with panda alone.
+    """
     with open(mer_file) as csvfile:
         reader = csv.DictReader(csvfile)
         mdf = pd.DataFrame(columns=reader.fieldnames)
@@ -239,7 +295,11 @@ def parse_merged(mer_file):
 
 
 def write_contact_file(sample_id='unknown sample', version='unknown'):
-    """Write tex file with contact information taken from ini file and sample_id in footer."""
+    """Write tex file with contact information taken from ini file and sample_id in footer.
+
+    :param sample_id: this will be written in the footer, left
+    :param version: MinVar version to be written in the footer, right
+    """
     config = configparser.ConfigParser()
     config.read(os.path.expanduser('~/.minvar/contact.ini'))
     try:
@@ -288,7 +348,7 @@ def write_contact_file(sample_id='unknown sample', version='unknown'):
 
 
 def write_run_info(handle):
-    """Write general information on the run."""
+    """Write general information on the run. Possible future expansion."""
     run_info = """
 
 Run information
@@ -302,7 +362,13 @@ threshold and a minimum depth of %d reads.
 
 
 def write_md(org=None, mut_file='final.csv', subtype_file='subtype_evidence.csv', sample_id=''):
-    """Write the markdown file."""
+    """Orchestrate the writing of the markdown file.
+
+    :param org: HIV or HCV
+    :param mut_file: csv file where ammino acid mutations are written with columns gene,wt,pos,mut,freq
+    :param subtype_file: csv file with subtype,support columns
+    :param sample_id: will be written in the title of the report
+    """
     logging.info('Writing report in markdown')
     rh = open('report.md', 'w')
     print('Sample %s: drug resistance mutations report' % sample_id, file=rh)
@@ -387,6 +453,7 @@ No HIV/HCV read found
                     '|{: ^10}|{: ^10}|{: ^15}|{: ^20}|'.format(int(row['pos']), row['mut'], int_freq, mut_cat),
                     file=rh)
             print('\n', file=rh)
+        write_ambig_score(rh)
     elif org == 'HCV':
         write_header_HCV(rh, resistance_mutations)
         write_run_info(rh)
@@ -425,12 +492,15 @@ No HIV/HCV read found
                     file=rh)
                 del index
             print('\n', file=rh)
-    write_ambig_score(rh)
     rh.close()
 
 
 def convert_2_pdf(sample_id='', version='unknown'):
-    """Convert markdown file to pdf with pandoc, filling sample and version info."""
+    """Convert markdown file to pdf with pandoc, filling sample and version info.
+
+    :param sample_id: sample name
+    :param version: MinVar version
+    """
     import shutil
 
     # copy template to current directory
