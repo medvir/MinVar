@@ -1,11 +1,37 @@
-    <!-- ******ABOUT****** -->
-    <section id="about" class="about section">
-        <div class="container">
-            <h2 class="title text-center">What is MinVar?</h2>
-            <p class="intro text-center">A command-line tool to discover
-                 drug resistance mutations in HIV-1 populations using deep
-                 sequencing data. Developed at <a href="http://www.imv.uzh.ch" target="_blank">IMV</a>, UniZurich.
-            </p>
+<!-- ******ABOUT****** -->
+<section id="about" class="about section">
+    <div class="container">
+        <h2 class="title text-center">What is MinVar?</h2>
+        <p class="intro text-center">A command-line tool to discover
+            drug resistance mutations in HIV-1 and HCV populations using deep
+            sequencing data. Developed at <a href="http://www.imv.uzh.ch" target="_blank">IMV</a>, UniZurich.
+        </p>
+
+        <div class="card-deck">
+            <div class="card text-white bg-secondary mb-3">
+                <!--img class="card-img-top" src="..." alt="Card image cap"-->
+                <div class="card-body">
+                    <h5 class="card-title">HIV-1</h5>
+                    <p class="card-text">The report for HIV-1 includes resistance information to antiviral drugs
+                        as predicted by <a href="https://hivdb.stanford.edu">HIVDB</a>.</p>
+                        <a href="report.html#hiv-report" class="btn btn-primary">Explore HIV-1 report</a>
+
+                    </div>
+                </div>
+
+                <div class="card text-white bg-secondary mb-3">
+                    <!--img class="card-img-top" src="..." alt="Card image cap"-->
+                    <div class="card-body">
+                        <h5 class="card-title">HCV</h5>
+                        <p class="card-text">HCV report includes estimate of the genotype and the list of resistance
+                            associated substitutions (RAS) with frequency.</p>
+                        <a href="report.html#hcv-report" class="btn btn-primary">Explore HCV report</a>
+                    </div>
+                </div>
+
+            </div>
+
+            <hr/>
 
             <div class="row">
 
@@ -16,47 +42,48 @@
                     <div class="content">
                         <h3 class="sub-title">Designed for clinicians</h3>
                         <p>Only one input file in FASTQ format is required,
-                        no need to set parameters. The final output is a PDF
-                        report with annotated DRM (annotations according to HIVDB).</p>
-                    </div><!--//content-->
-                </div><!--//item-->
+                            no need to set parameters. The final output is a PDF
+                            report with annotated mutations.</p>
+                        </div><!--//content-->
+                    </div><!--//item-->
 
-                <div class="item col-md-6 col-sm-6 col-xs-12">
-                    <div class="icon-holder">
-                        <i class="fa fa-crosshairs"></i>
-                    </div>
-                    <div class="content">
-                        <h3 class="sub-title">Accurate</h3>
-                        <p>On an extensive set of control experiments, MinVar
-                        reliably called variants down to 5%. In the paper we recommend
-                        and motivate this as an accurate detection threshold.
-                        </p>
-                    </div><!--//content-->
-                </div><!--//item-->
+                    <div class="item col-md-6 col-sm-6 col-xs-12">
+                        <div class="icon-holder">
+                            <i class="fa fa-crosshairs"></i>
+                        </div>
+                        <div class="content">
+                            <h3 class="sub-title">Accurate</h3>
+                            <p>On an extensive set of control experiments, MinVar
+                                reliably called variants down to 5%. In the paper we recommend
+                                and motivate this as an accurate detection threshold.
+                            </p>
+                        </div><!--//content-->
+                    </div><!--//item-->
 
-                <div class="item col-md-6 col-sm-6 col-xs-12">
-                    <div class="icon-holder">
-                        <i class="fa fa-clock-o"></i>
-                    </div>
-                    <div class="content">
-                        <h3 class="sub-title">Quick</h3>
-                        <p>Run time is negligible compared to the overall experiment.</p>
-                    </div><!--//content-->
-                </div><!--//item-->
+                    <div class="item col-md-6 col-sm-6 col-xs-12">
+                        <div class="icon-holder">
+                            <i class="fa fa-clock-o"></i>
+                        </div>
+                        <div class="content">
+                            <h3 class="sub-title">Quick</h3>
+                            <p>Run time is in the order of a few minutes per sample; negligible compared to the overall
+                                experiment.</p>
+                            </div><!--//content-->
+                        </div><!--//item-->
 
-                <div class="clearfix visible-md"></div>
+                        <div class="clearfix visible-md"></div>
 
-                <div class="item col-md-6 col-sm-6 col-xs-12">
-                    <div class="icon-holder">
-                        <i class="fa fa-arrows-alt"></i>
-                    </div>
-                    <div class="content">
-                        <h3 class="sub-title">Versatile</h3>
-                        <p>MinVar was successfully tested on reads from both
-                        Roche/454 and Illumina MiSeq sequencing platforms.</p>
-                    </div><!--//content-->
-                </div><!--//item-->
+                        <div class="item col-md-6 col-sm-6 col-xs-12">
+                            <div class="icon-holder">
+                                <i class="fa fa-arrows-alt"></i>
+                            </div>
+                            <div class="content">
+                                <h3 class="sub-title">Versatile</h3>
+                                <p>MinVar was successfully tested with reads from Illumina MiSeq and Roche/454 sequencing platforms.
+                                    (HCV was tested with Illumina only).</p>
+                                </div><!--//content-->
+                            </div><!--//item-->
 
-            </div><!--//row-->
-        </div><!--//container-->
-    </section><!--//about-->
+                        </div><!--//row-->
+                    </div><!--//container-->
+                </section><!--//about-->
