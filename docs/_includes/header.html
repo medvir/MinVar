@@ -2,23 +2,27 @@
     <header id="header" class="header">
         <div class="container">
             <h1 class="logo pull-left">
-                <a class="scrollto" href="/">
+                <a class="nav-link" href="/">
                     <span class="logo-title">MinVar</span>
                 </a>
             </h1><!--//logo-->
             <nav class="navbar navbar-toggleable-md navbar-light bg-faded">
-                <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse" data-target="#navbarText" aria-controls="navbarText" aria-expanded="false" aria-label="Toggle navigation">
+                <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse" data-target="#navbar-collapse" aria-controls="navbarText" aria-expanded="false" aria-label="Toggle navigation">
                   <span class="navbar-toggler-icon"></span>
                 </button>
                 <!-- Something on the right end of the navbar -->
                 <!--a class="navbar-brand" href="/">MinVar2</a-->
-                <div class="collapse navbar-collapse" id="navbarText">
+                <div class="navbar-collapse collapse" id="navbar-collapse">
                   <ul class="navbar-nav mr-auto">
-                        <li class="nav-item"><a class="nav-link" href="#top">Top</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/#about">About</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/#license">License</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/#contact">Contact</a></li>
+                      {% if page.url == "/" %}
+                        <li class="nav-item"><a class="nav-link scrollto" data-toggle="collapse" data-target=".navbar-collapse.show" href="#about">About</a></li>
+                        <li class="nav-item"><a class="nav-link scrollto" data-toggle="collapse" data-target=".navbar-collapse.show" href="#license">License</a></li>
+                        <li class="nav-item"><a class="nav-link scrollto" data-toggle="collapse" data-target=".navbar-collapse.show" href="#contact">Contact</a></li>
                         <li class="nav-item"><a class="nav-link" href="report.html">Report</a></li>
+                    {% else %}
+                        <li class="nav-item"><a class="nav-link scrollto" data-toggle="collapse" data-target=".navbar-collapse.show" href="report.html#hiv-report">HIV report</a></li>
+                        <li class="nav-item"><a class="nav-link scrollto" data-toggle="collapse" data-target=".navbar-collapse.show" href="report.html#hcv_report">HCV report</a></li>
+                    {% endif %}
                   </ul>
               </div>
           </nav>
