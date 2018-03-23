@@ -12,3 +12,4 @@ files.txt
 .tox/
 minvarenv/
 .cache/
+docs/_site/

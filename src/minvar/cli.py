@@ -42,16 +42,11 @@ parser = argparse.ArgumentParser()
 group1 = parser.add_argument_group('Input files', 'Required input')
 group1.add_argument("-f", "--fastq", default="", type=str, dest="f",
                     help="input reads in fastq format")
-group1.add_argument(
-    "-r", "--recal", action="store_true",
-    help="turn on recalibration with GATK <default: %(default)s>",
-    default=False)
+group1.add_argument("-r", "--recal", action="store_true",
+                    help="turn on recalibration with GATK <default: %(default)s>", default=False)
 group1.add_argument("-k", "--keep", action="store_true",
-                    help="keep intermediate files <default: %(default)s>",
-                    default=False)
-group1.add_argument('-v', '--version', action='version',
-                    version=__version__)
-
+                    help="keep intermediate files <default: %(default)s>", default=False)
+group1.add_argument('-v', '--version', action='version', version=__version__)
 
 # exit so that log file is not written
 if len(sys.argv) == 1:
@@ -74,14 +69,11 @@ def main(args=None):
     cns_file, prepared_bam, org_found = prepare.main(args.f)
 
     from minvar import callvar
-    called_file, called_bam = callvar.main(ref_file=cns_file,
-                                           bamfile=prepared_bam,
-                                           caller='lofreq',
+    called_file, called_bam = callvar.main(ref_file=cns_file, bamfile=prepared_bam, caller='lofreq',
                                            recalibrate=args.recal)
 
     from minvar import annotate
-    annotate.main(vcf_file=called_file, ref_file=cns_file, bam_file=called_bam,
-                  organism=org_found)
+    annotate.main(vcf_file=called_file, ref_file=cns_file, bam_file=called_bam, organism=org_found)
 
     from minvar import reportdrm
     reportdrm.main(org=org_found, subtype_file='subtype_evidence.csv', fastq=args.f, version=__version__)
@@ -92,11 +84,3 @@ def main(args=None):
                 os.remove(f)
             except FileNotFoundError:
                 pass
-
-    # if org_found == 'HIV':
-    #     from minvar import stats
-    #     bed_file = resource_filename(__name__, 'db/HIV/consensus_B.bed')
-    #     stats.coverage_stats_per_base(called_bam, bed_file)
-    #     cum_cov = stats.gene_coverage(called_bam, bed_file)
-    #     for k, v in cum_cov.items():
-    #         print(k, v)

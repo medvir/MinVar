@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
-"""Prepare reads: filter, find organism and subtype, make consensus."""
+"""
+``prepare`` -Filter reads, find organism and subtype, make consensus.
+
+The input here is only the file with reads in FASTQ. It filters them based on length and quality,
+then subsamples them and starts the comparison against known reference sequences. This detects
+the organism and the genotype/subtype, writing evidence in ``subtype_evidece.csv``. Then, the
+iterative procedure to build a consensus starts.
+
+The output is the consensus in ``cns_final.fasta``, the file with filtered reads and a string with
+the organism (HIV or HCV).
+
+"""
 import gzip
 import logging
 import os

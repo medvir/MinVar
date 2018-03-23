@@ -1,5 +1,20 @@
 #!/usr/bin/env python3
-"""Call lofreq to produce a vcf file."""
+"""
+``callvar`` - Calls `LoFreq <http://csb5.github.io/lofreq/>`_ to produce a vcf file.
+
+Its main is called by ``cli.py`` with the following parameters:
+
+    :param ref_file: reference in FASTA format
+    :param bamfile: BAM alignment where mutations will be called with alignment of reads to ``ref_file``
+    :param caller: currently only ``lofreq`` is supported
+    :param recalibrate: invokes base recalibration by means of GATK
+    :type recalibrate: boolean, default FALSE
+
+``callvar`` returns the VCF file and the recalibrated BAM file. It must be noted that ``recalibrate`` only
+refers to recalibration done by GATK. A recalibration of the indels is done anyway by lofreq in the function
+``indelqual`` and is needed to call indel mutations.
+
+"""
 
 import logging
 import os

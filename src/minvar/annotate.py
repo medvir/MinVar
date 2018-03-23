@@ -1,6 +1,37 @@
 #!/usr/bin/env python3
-"""Interprets the vcf and translates it into amminoacid mutations."""
+"""
+``annotate`` - Interprets the vcf and translates it into amminoacid mutations.
 
+It is called by ``cli.py`` with the following parameters:
+
+    :param vcf_file: VCF file with mutations
+    :param ref_file: reference in FASTA format used to call mutations
+    :param bam_file: BAM file that was used to call mutations
+    :param organism: string defining what virus is being analyzed
+    :type organism: HCV or HIV
+
+
+``annotate.py`` is the most complex module in MinVar. By reading mutation and reference sequence
+files, it builds a representation of all bases found at every position with relative frequency.
+Further, it translates this representation into ammino acids and, aligning to organism references,
+annotates them with gene name and position.
+
+The main output is the file ``final.csv`` reporting all mutations with respect to the organism
+consensus (consensus B for HIV, H77 for HCV). Example::
+
+    gene,wt,pos,mut,freq
+    E2,V,155,I,1.0000
+    E2,T,175,S,1.0000
+    E2,V,187,I,0.0270
+    E2,V,191,A,0.9212
+    E2,L,197,H,1.0000
+
+Other two files produced are:
+
+- ``cns_ambiguous.fasta`` nucleotide sequence, with wobble bases if frequency > 15%,
+- ``cns_max_freq.fasta`` nucleotide sequence, only the nucleotide at max frequency is reported.
+
+"""
 import logging
 import os
 import shlex
@@ -91,7 +122,7 @@ def find_frame(ref):
         if len1 > max_len:
             best_frame = f
             max_len = len1
-#    to_trim = (len(refseq) - best_frame + 1) % 3
+    # to_trim = (len(refseq) - best_frame + 1) % 3
     return best_frame, aa_seq[best_frame].rstrip('*')
 
 
@@ -417,7 +448,7 @@ def nt_freq_2_aa_freq(df_nt, frame, bam_file=None):
         2    C      0.1
         3    A      1.0
 
-    bam_file is used to phase mutations found on two positions.
+    ``bam_file`` is used to phase mutations found on two positions.
     """
     from itertools import product
     df_nt = df_nt.sort_values(by=['pos', 'freq'], ascending=[True, False])
