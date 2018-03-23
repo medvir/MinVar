@@ -8,10 +8,11 @@ setup(
     install_requires=['setuptools_scm'],
     tests_require=['pytest', 'flake8'],
     name='MinVar',
-    description='Minority variants in HIV',
+    description='Minority variants in HIV-1/HCV',
     url='https://github.com/ozagordi/MinVar',
     author='Osvaldo Zagordi',
     author_email='firstname.lastname@gmail.com',
+    license='Other/Proprietary License',
     packages=find_packages('src'),  # include all packages under src
     package_dir={'': 'src'},  # tell setuptools packages are under src
     package_data={'minvar': ['db/HIV/*', 'db/HCV/*', 'db/template.tex']},

@@ -245,6 +245,7 @@ def compute_org_mutations(aa_sequence, org_found):
     reference depending on org_found (H77 for org_found=HCV,
     consensus_B for org_found=HIV) and returns a DataFrame where, on
     each row, are
+
     - wt: amminoacid on organism sequence,
     - pos: position on the organism sequence,
     - mut: amminoacid on aa_sequence,
@@ -293,13 +294,16 @@ def compute_org_mutations(aa_sequence, org_found):
             in_save.append(in_pos)
             mut_save.append(z[1])
 
-    # treat last position explicitely
-    if org_seq[end_pos] != in_seq[end_pos]:
-        nmuts += 1
-        wt_save.append(org_seq[end_pos])
-        pos_save.append(org_pos + 1)
-        in_save.append(in_pos + 1)
-        mut_save.append(in_seq[end_pos])
+    try:  # treat last position explicitely
+        if org_seq[end_pos] != in_seq[end_pos]:
+            nmuts += 1
+            wt_save.append(org_seq[end_pos])
+            pos_save.append(org_pos + 1)
+            in_save.append(in_pos + 1)
+            mut_save.append(in_seq[end_pos])
+    except IndexError:
+        # if sequences end together with an ammino acid end_pos is beyond the last position
+        logging.debug('sequences do not end together')
 
     logging.info('%d mutated sites found on sample consensus', nmuts)
     # parse insertions (i.e. gaps in org_seq)
@@ -405,12 +409,13 @@ def nt_freq_2_aa_freq(df_nt, frame, bam_file=None):
     """Compute aminoacid mutations from a DataFrame of nucleotide mutations.
 
     Nucleotides passed are expected to be on the same codon.
-    Example:
-    pos  mut    freq    --->    pos   codon  freq    --->    pos   aa   freq
-    1    T      1.0              1     TTA    0.9             1     L    0.9
-    2    T      0.9              1     TCA    0.1             1     S    0.9
-    2    C      0.1
-    3    A      1.0
+    Example::
+
+        pos  mut    freq    --->    pos   codon  freq    --->    pos   aa   freq
+        1    T      1.0              1     TTA    0.9             1     L    0.9
+        2    T      0.9              1     TCA    0.1             1     S    0.9
+        2    C      0.1
+        3    A      1.0
 
     bam_file is used to phase mutations found on two positions.
     """
