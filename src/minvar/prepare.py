@@ -4,7 +4,7 @@
 
 The input here is only the file with reads in FASTQ. It filters them based on length and quality,
 then subsamples them and starts the comparison against known reference sequences. This detects
-the organism and the genotype/subtype, writing evidence in ``subtype_evidece.csv``. Then, the
+the organism and the genotype/subtype, writing evidence in ``subtype_evidence.csv``. Then, the
 iterative procedure to build a consensus starts.
 
 The output is the consensus in ``cns_final.fasta``, the file with filtered reads and a string with
@@ -73,6 +73,9 @@ def compute_min_len(filename):
 
     reads_len = sorted(reads_len)
     n = len(reads_len)
+    logging.info('Found %d reads in input file', n)
+    if n < 2E5:
+        logging.warning('WATCH OUT: LOW NUMBER OF READS')
     percentile_5 = reads_len[int(0.05 * n)]
     logging.info('5th percentile: %d', percentile_5)
     return percentile_5 - 2
