@@ -101,7 +101,8 @@ hiv_map = {
     'CONSENSUS_F1': 'F1',
     'CONSENSUS_F2': 'F2',
     'CONSENSUS_G': 'G',
-    'CONSENSUS_H': 'H'
+    'CONSENSUS_H': 'H',
+    'CONSENSUS_O': 'O'
 }
 
 
@@ -130,7 +131,8 @@ org_dict = {
     'CONSENSUS_10_CD': 'HIV',
     'CONSENSUS_11_CPX': 'HIV',
     'CONSENSUS_12_BF': 'HIV',
-    'CONSENSUS_14_BG': 'HIV'
+    'CONSENSUS_14_BG': 'HIV',
+    'CONSENSUS_O': 'HIV'
     }
 for k in hcv_map:
     org_dict[k] = 'HCV'
