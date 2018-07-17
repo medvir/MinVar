@@ -278,19 +278,42 @@ def parse_merged(mer_file):
     all aminoacids except X, Y, and Z. This function translated this into a list of
     valid ammino acids. It was too complicated to achieve this functionality with panda alone.
     """
-    with open(mer_file) as csvfile:
-        reader = csv.DictReader(csvfile)
-        mdf = pd.DataFrame(columns=reader.fieldnames)
-        for row in reader:
-            row['freq'] = float(row['freq'])
-            row['pos'] = int(row['pos'])
-            if row['mut_x'] in aa_unpack(row['mut_y']):
-                mdf = mdf.append(row, ignore_index=True)
-            elif row['mut_x'] == '-' and 'd' in aa_unpack(row['mut_y']):
-                mdf = mdf.append(row, ignore_index=True)
-            elif row['mut_x'] and row['mut_y'] == '':
-                row['category'] = 'unannotated'
-                mdf = mdf.append(row, ignore_index=True)
+    # read file with annotations, result of a merge detected with HIVdb annotations
+    annotated = pd.read_csv(mer_file)
+    # prepare output file
+    genes = []
+    positions = []
+    wts = []
+    muts = []
+    freqs = []
+    comments = []
+    # iterate on annotations grouped by gene/pos
+    for name, group in annotated.groupby(['gene', 'pos']):
+        aas = group[pd.notna(group['mut_x'])]['mut_x'].tolist()
+        if not aas:  # mutation not detected at this position
+            continue
+        mutation_found = False
+        # mut_x is detected, mut_y is annotation, iterate on detected to see if it is among the annotated ones
+        for idx, row in group.iterrows():
+            detected_mutation = row['mut_x']
+            if detected_mutation in str(row['mut_y']):
+                mutation_found = True
+                genes.append(name[0])
+                positions.append(name[1])
+                wts.append(row['wt'])
+                freqs.append(row['freq'])
+                muts.append(row['mut_x'])
+                comments.append(row['comment'])
+                break
+        if not mutation_found:
+            genes.append(name[0])
+            positions.append(name[1])
+            wts.append(row['wt'])
+            freqs.append(row['freq'])
+            muts.append(row['mut_x'])
+            comments.append('unannoted')
+    mdf = pd.DataFrame({'gene': genes, 'pos': positions, 'wt': wts, 'mut': muts, 'freq': freqs, 'comment': comments})
+    print(len(mdf))
     return mdf
 
 
@@ -531,4 +554,6 @@ def main(org=None, subtype_file=None, fastq='unknown', version='unknown'):
 
 if __name__ == '__main__':
     # write_sierra_results(sys.stdout, 'final.csv')
-    main(org=sys.argv[1], subtype_file='subtype_evidence.csv')
+    x = parse_merged('merged_muts_drm_annotated.csv')
+    x.to_csv('x.csv')
+    #main(org=sys.argv[1], subtype_file='subtype_evidence.csv')
