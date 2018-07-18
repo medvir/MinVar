@@ -272,7 +272,9 @@ def aa_unpack(mut_string):
 
 
 def parse_merged(mer_file):
-    """OUTDATED: manual conversion of mutations extracted from HIVdb comment files.
+    """Manual conversion of mutations extracted from HIVdb comment files.
+
+    This has been adapted to work on HIVdb 8.4 files.
 
     In older versions, comment files contained information with NOT XYZ to signify
     all aminoacids except X, Y, and Z. This function translated this into a list of
@@ -286,6 +288,7 @@ def parse_merged(mer_file):
     wts = []
     muts = []
     freqs = []
+    categories = []
     comments = []
     # iterate on annotations grouped by gene/pos
     for name, group in annotated.groupby(['gene', 'pos']):
@@ -295,6 +298,7 @@ def parse_merged(mer_file):
         mutation_found = False
         # mut_x is detected, mut_y is annotation, iterate on detected to see if it is among the annotated ones
         for idx, row in group.iterrows():
+            del idx
             detected_mutation = row['mut_x']
             if detected_mutation in str(row['mut_y']):
                 mutation_found = True
@@ -303,6 +307,7 @@ def parse_merged(mer_file):
                 wts.append(row['wt'])
                 freqs.append(row['freq'])
                 muts.append(row['mut_x'])
+                categories.append(row['category'])
                 comments.append(row['comment'])
                 break
         if not mutation_found:
@@ -311,9 +316,12 @@ def parse_merged(mer_file):
             wts.append(row['wt'])
             freqs.append(row['freq'])
             muts.append(row['mut_x'])
+            categories.append('unannotated')
             comments.append('unannoted')
-    mdf = pd.DataFrame({'gene': genes, 'pos': positions, 'wt': wts, 'mut': muts, 'freq': freqs, 'comment': comments})
-    print(len(mdf))
+
+    mdf = pd.DataFrame({'gene': genes, 'pos': positions, 'wt': wts, 'mut': muts, 'freq': freqs,
+                        'category': categories, 'comment': comments})
+
     return mdf
 
 
@@ -554,6 +562,6 @@ def main(org=None, subtype_file=None, fastq='unknown', version='unknown'):
 
 if __name__ == '__main__':
     # write_sierra_results(sys.stdout, 'final.csv')
-    x = parse_merged('merged_muts_drm_annotated.csv')
-    x.to_csv('x.csv')
-    #main(org=sys.argv[1], subtype_file='subtype_evidence.csv')
+    #x = parse_merged('merged_muts_drm_annotated.csv')
+    #x.to_csv('x.csv')
+    main(org=sys.argv[1], subtype_file='subtype_evidence.csv')

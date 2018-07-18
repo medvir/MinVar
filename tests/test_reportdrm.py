@@ -13,7 +13,7 @@ assert os.path.exists(test_mer)
 def test_parse_merged():
     out = parse_merged(test_mer)
     assert len(out) == 8, out
-    
+
     # assert out_0['wt'] == 'T', out
     # assert out_0['pos'] == 4, out
     # assert out_0['mut'] == 'A', out
@@ -28,7 +28,6 @@ def test_parse_merged():
 
 @pytest.mark.skip(reason='Still an empty box')
 def test_parse_merged_2():
-    import pandas as pd
     '''
     A, 1011, G
     A, 1050, T
