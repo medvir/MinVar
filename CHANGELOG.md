@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Ambiguity score is now computed on PRRT up to aa 335.
 
 ### Fixed
+- Bugfix: unannotated mutations were not always reported in the tables (issue #25).
 - Reference and consensus protein sequences having the same end would make `annotate.py` fail, fixed.
 
 ## [v2.2] - 2017-02-05

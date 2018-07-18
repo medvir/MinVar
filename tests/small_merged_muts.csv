@@ -1,0 +1,18 @@
+gene,wt,pos,mut_x,freq,mut_y,category,comment
+GagPolTF,D,5,N,1.0,,,
+GagPolTF,S,53,T,1.0,,,
+protease,L,10,I,0.0809,F,Accessory,"L10F is a common non-polymorphic, PI-selected accessory mutation associated with reduced susceptibility to DRV, FPV, IDV, LPV, and NFV."
+protease,L,10,I,0.0809,IV,Other,"L10I/V are polymorphic, PI-selected accessory mutations that increase the replication of viruses with other PI-resistance mutations."
+protease,L,10,I,0.0809,RY,Other,"L10R/Y are rare, non-polymorphic PI-selected mutations. Their effects on PI susceptibility have not been well studied."
+protease,K,20,R,0.983,I,Other,"K20I is the consensus amino acid in subtype G and CRF02_AG. In subtypes B and C, K20I is a PI-selected accessory mutation that reduces NFV susceptibility."
+protease,K,20,R,0.983,MV,Other,"K20M/V are rare, relatively non-polymorphic PI-selected mutations that have not been well studied."
+protease,K,20,R,0.983,R,Other,K20R is a highly polymorphic PI-selected accessory mutation.
+protease,K,20,R,0.983,T,Accessory,K20T is a non-polymorphic accessory PI-selected mutation associated with reduced susceptibility to each of the PIs except DRV and TPV.
+protease,L,89,M,1.0,VT,Accessory,"L89V is a non-polymorphic PI-selected accessory mutation that contributes reduced susceptibility to FPV, DRV, NFV, and IDV. L89V is included in the Tibotec DRV genotypic susceptibility score. L89T is a rare non-polymorphic PI-selected mutation that has not been well studied."
+RT,D,123,*,0.0179,,,
+RT,V,179,I,1.0,DE,NNRTI,V179D is a polymorphic accessory NNRTI-selected mutation. It contributes low-levels reductions in susceptibility to each of the NNRTIs. The combination of V179D and K103R act synergistically to reduce NVP and EFV susceptibility. V179D has a low weight in the Tibotec ETR genotypic susceptibility score. V179E is a non-polymorphic mutation occasionally selected by NVP and EFV. V179E appears similar to V179D in its effects on NNRTIs. V179D/E do not appear to reduce the virological response to a first-line EFV-containing regimen.
+RT,V,179,I,1.0,F,NNRTI,"V179F is a non-polymorphic mutation frequently selected in patients receiving ETR. It nearly always occurs in combination with Y181C. Alone V179F has little effect on NNRTI susceptibility. However, the combination of V179F and Y181C is associated with high-level ETR and RPV resistance. It has a low weight in the Tibotec ETR genotypic susceptibility score."
+RT,V,179,I,1.0,I,Other,"V179I is a polymorphic mutation that is frequently selected in patients receiving ETR and RPV. But It has little, if any, direct effect on NNRTI susceptibility."
+RT,V,179,I,1.0,L,NNRTI,V179L is a rare non-polymorphic mutation occasionally selected in patients receiving NNRTIs. Its effects on NNRTI susceptibility have not been well studied. It is listed as an RPV-associated resistance mutation in the RPV package-insert.
+RT,V,179,I,1.0,T,NNRTI,"V179T is a relatively rare non-polymorphic mutation occasionally selected in patients receiving NNRTIs. It is associated with minimal, if any, reduction in ETR and RPV susceptibility. It has a low weight in the Tibotec ETR genotypic susceptibility score."
+RT,D,192,N,0.0153,,,
