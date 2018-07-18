@@ -1,6 +1,8 @@
 ---
 title: MinVar
 tagline: a virus genotyping tool
+author: Osvaldo Zagordi
+description: Diagnostic software to detect and annotate drug resistance mutations in HIV-1 and HCV from NGS data and produce a report for clinicians.
 ---
 
 baseurl: /MinVar
