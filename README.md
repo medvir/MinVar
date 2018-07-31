@@ -74,6 +74,9 @@ will write `logo = company_logo_bw`.
 
 See the official [documentation](http://minvar.readthedocs.io/en/latest/).
 
+API documentation can be created by cloning this repo, `cd`-ing into
+`apidoc` and running `make html`.
+
 #### Citation
 
 MinVar (version 1, HIV-1 support only) has been introduced and validated in  
