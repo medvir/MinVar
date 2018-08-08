@@ -106,6 +106,16 @@ drug resistance genotyping by deep sequencing _Journal of virological methods_
   alignment of reads to different references and tables with mutations. The
   pdf report is created from the template `minvar/db/template.tex`.
 
+
+## Add a new reference to the sequence database
+
+MinVar looks for reference sequences in two files. Respectively, in
+
+- `src/minvar/db/organism/subtype_references.fasta` (for non-recombinant forms) and
+- `src/minvar/db/organism/recomb_references.fasta` (for recombinant forms),
+
+where `organism` is HIV or HCV.
+
 #### Citation
 
 MinVar has been introduced and validated in  
