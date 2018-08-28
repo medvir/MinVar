@@ -4,7 +4,7 @@
    :alt: MinVar: A tool to detect minority variants in HIV-1/HCV populations
    :class: floatingflask
 
-Welcome to MinVar's documentation!
+Welcome to MinVar documentation!
 ==================================
 
 Contents:
