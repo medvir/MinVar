@@ -54,7 +54,7 @@ in HIV-1 and HCV populations using deep sequencing data.
 - The annotated mutations are saved in a csv file (see example above) and also
   included in a report in markdown format that is finally converted to PDF.
 - The PDF report can be customized by adding contact information specified in the
-  file `~/.minvar/contac.ini` with the following syntax (only change what comes
+  file `~/.minvar/contact.ini` with the following syntax (only change what comes
   after the `=` sign)
 
 ```
