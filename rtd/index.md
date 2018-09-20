@@ -97,6 +97,10 @@ drug resistance genotyping by deep sequencing _Journal of virological methods_
 - `max_freq_muts_aa.csv` the amminoacid found at maximum frequency at each codon,
 - `final.csv` mutations at amminoacid level with indication of
   the gene, the position on the gene, wild type and frequency
+- `cns_ambiguous.fasta` nucleotide sequence with wobble bases if frequency > 15%,
+  if coverage is less than `coverage_threshold` (default=100), an `N` is reported;
+- `cns_max_freq.fasta` nucleotide sequence where only the nucleotide at max frequency is reported.
+  If coverage is low than the base reference sequence is reported.
 
 ### Created by `reportdrm.py`
 
