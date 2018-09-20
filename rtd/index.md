@@ -116,6 +116,21 @@ MinVar looks for reference sequences in two files. Respectively, in
 
 where `organism` is HIV or HCV.
 
+New reference sequences can be added there, provided that related data structures in
+`src/minvar/common.py` are updated to reflect the reference names as outlined below.
+
+#### If an HIV reference sequence was added
+
+- Add a key:value pair to `hiv_map` where the key is the id as in the fasta header and the
+  value is an abbreviation for it. Example `'CONSENSUS_12_BF':'CRF12_BF'`.
+- Add a key:value pair to `org_dict` where the key is the id as in the fasta header and the
+  value is `HIV`.
+
+#### If an HCV reference sequence was added
+- Edit (if the reference added is from a genotype already present) or add (if a new genotype is being added)
+  the key:value pair in `acc_numbers` where the key is the genotype of the sequence being added (_e.g._ 1a)
+  and the value is the list of sequence ids as in the fasta headers for that genotype.
+
 #### Citation
 
 MinVar has been introduced and validated in  
