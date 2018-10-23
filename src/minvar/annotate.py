@@ -436,6 +436,16 @@ def get_coverage(sorted_bam_file):
     return cov_df
 
 
+def add_coverage_2_merged(merged, coverage_df):
+    """Add the coverage information to the merged dataframe that includes 
+    reference bases and mutations.
+    
+    This returns merged_w_cov dataframe with freq, mu, pos, coverage columns.
+    """
+    merged_w_cov = pd.merge(merged, coverage_df[['pos', 'coverage']], on='pos', how='left')    
+    return merged_w_cov
+
+
 def nt_freq_2_aa_freq(df_nt, frame, bam_file=None):
     """Compute aminoacid mutations from a DataFrame of nucleotide mutations.
 
@@ -530,10 +540,11 @@ def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_fi
     # vcf_mutations.to_csv('vcf_mutations_nt.csv', index=False, float_format='%6.4f')
     logging.info('apply mutations in vcf to sample reference')
     merged = merge_mutations(cns_variants_nt, vcf_mutations)
-    # merged contains three columns: variant, frequency and position of the sample consensus
-    merged.to_csv('merged_mutations_nt.csv', index=False, float_format='%6.4f')
-
     coverage_df = get_coverage(bam_file)
+    merged_with_coverage = add_coverage_2_merged(merged,coverage_df)
+    # merged_with_coverage contains four columns: variant, frequency, position of the sample consensus and coverage
+    merged_with_coverage.to_csv('merged_mutations_nt.csv', index=False, float_format='%6.4f')  
+    
     logging.info('save consensus sequence with wobbles to file')
     ambi_cns = Seq(df_2_ambiguous_sequence(merged, coverage_df))
     assert len(ambi_cns) == len(ref_nt), '%d - %d' % (len(ambi_cns), len(ref_nt))
