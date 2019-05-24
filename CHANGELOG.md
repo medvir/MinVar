@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Added
+- Coverage information is added to the merged_mutations_nt.csv file.
+
+### Fixed
+- 
+
+## [v2.2.1] - 2018-10-17
+
 ### Changed
 - Ambiguity score is now computed on PRRT up to aa 335.
 
