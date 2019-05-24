@@ -181,7 +181,11 @@ def write_sierra_results(handle, mut_file):
             drugClass = drugscore['drugClass']['name']
             drug = drug_names.get(drugscore['drug']['name'], drugscore['drug']['name'])
             drug += ' (%s)' % drugscore['drug']['displayAbbr']
-            all_muts = ' + '.join((partial['mutations'][0]['text'] for partial in drugscore['partialScores']))
+            muts_set = set()
+            muts_set.update((partial['mutations'][0]['text'] for partial in drugscore['partialScores']))
+            all_muts = ''
+            if len(muts_set): 
+                all_muts = ' + '.join(muts_set)
 
             colour = cell_colour.get(drugscore['text'], 'white')
             print('|{: ^7}|{: ^22}|{: ^6}|\\cellcolor{{{}}}{: ^22}|{: ^40}|'.format(
@@ -199,6 +203,10 @@ def write_sierra_results(handle, mut_file):
         #  if len(partial['mutations']) > 1:
         #      pprint(partial)
         # assert len(partial['mutations']) == 1, partial['mutations']
+    print('\nNote', file=handle)
+    print('--\n', file=handle)
+    print('Single and combined mutations are considered for the assessment, '
+          'however only single mutations are reported in the above tables.', file=handle)
     print('\\newpage', file=handle)
 
 
@@ -371,7 +379,7 @@ def write_contact_file(sample_id='unknown sample', version='unknown'):
     # \begin{tabular}{@{}r@{}}
     #   %\DTMnow \\[\normalbaselineskip]
     #   Institute of Medical Virology \\
-    #   Telephone + 41 44 63 42653  \\
+    #   Telephone + 41 44 63 42653 \\
     #   Fax + 41 44 63 44967 \\
     #   Email \href{mailto:med-virology@virology.uzh.ch}{med-virology@virology.uzh.ch}
     # \end{tabular}
