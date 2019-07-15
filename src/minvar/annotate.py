@@ -419,7 +419,7 @@ def df_2_ambiguous_sequence(df_in, cov_df=None):
     df_in = df_in[df_in['freq'] >= 0.15]
     # aggregate calls for the same position
     all_nt = df_in.groupby(['pos']).agg({'mut': lambda x: ''.join(sorted(x))})
-    # create a columng of ambiguous bases
+    # create a columng of ambiguous bases * so insertion is not considered because only the first nc is returned
     all_nt['ambi'] = all_nt.apply(lambda row: d2a.get(row['mut'], row['mut'][0]), axis=1)
     all_nt.reset_index(inplace=True)
     if not cov_df is None:
@@ -444,7 +444,6 @@ def add_coverage_2_merged(merged, coverage_df):
     """
     merged_w_cov = pd.merge(merged, coverage_df[['pos', 'coverage']], on='pos', how='left')    
     return merged_w_cov
-
 
 def nt_freq_2_aa_freq(df_nt, frame, bam_file=None):
     """Compute aminoacid mutations from a DataFrame of nucleotide mutations.
@@ -577,6 +576,8 @@ def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_fi
     aas_save = []
     freqs_save = []
     nt_save = []
+    nt_info_save = []
+    #nt_freq_save = []
     for c in codon_positions:
         codon_muts = merged[merged.pos.isin(c)]  # extracts just the affected positions
         a_pos, aas, freqs, nts = nt_freq_2_aa_freq(codon_muts, frame_max, bam_file)
@@ -584,19 +585,48 @@ def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_fi
         aas_save.extend(aas)
         freqs_save.extend(freqs)
         nt_save.extend(nts)
-    all_muts_aa = pd.DataFrame({'freq': freqs_save, 'in_pos': a_pos_save, 'mut': aas_save, 'nts': nt_save})
+        #nt_freq_save.append(nt_freq)
+        for i in a_pos:
+            codon_muts_copy = codon_muts.copy(deep=True)
+            nt_info_save.append(codon_muts_copy)
+    #all_muts_aa = pd.DataFrame({'freq': freqs_save, 'in_pos': a_pos_save, 'mut': aas_save, 'nts': nt_save})
+    all_muts_aa = pd.DataFrame({'freq': freqs_save, 'in_pos': a_pos_save, 'mut': aas_save, 'nts': nt_save, 'nt_info':nt_info_save })
     # join with max_freq_muts_aa on in_pos (sample consensus positions) to obtain positions on H77/consensus_B
     all_muts_aa_full = pd.merge(max_freq_muts_aa, all_muts_aa, on='in_pos')
-    all_muts_aa_full.drop(['mut_x', 'in_pos'], axis=1, inplace=True)
+    
+    all_muts_nt_duplicate = all_muts_aa_full.loc[:,['pos','nt_info']].copy(deep=True)
+    all_muts_nt_nested = all_muts_nt_duplicate.drop_duplicates(subset= 'pos')
+    ref_start_pos = all_muts_nt_nested['pos'].iloc[0]
+    all_muts_nt_list = all_muts_nt_nested['nt_info'].tolist()
+    all_muts_nt = pd.concat(all_muts_nt_list, ignore_index=True)
+    #all_muts_nt['pos'] = all_muts_nt['pos'] - all_muts_nt['pos'][0] + 1
+    delta = (all_muts_nt['pos'][0] - (3 * (ref_start_pos - 1) + 1))
+    all_muts_nt['pos'] = all_muts_nt['pos'] - delta
+    all_muts_nt.to_csv('mutations_nt_pos_ref_aa.csv', index=False, float_format='%6.4f')
+    
+    assert (all_muts_nt['pos'] > 0).all() 
+    if organism == 'HIV':
+        #assert all_muts_nt['pos'].iloc[-1] == max_freq_muts_aa['pos'].iloc[-1] * 3
+        if all_muts_nt['pos'].iloc[-1] != max_freq_muts_aa['pos'].iloc[-1] * 3:
+            logging.debug("The last position of mutations_nt_pos_ref_aa.csv file did not match with the last position of max_freq_muts_aa.csv file. ")
+    
+    all_muts_aa_full.drop(['mut_x', 'in_pos','nt_info'], axis=1, inplace=True)
     # all_muts_aa_full.drop(['mut_x'], axis=1, inplace=True)
     all_muts_aa_full.rename(columns={'mut_y': 'mut'}, inplace=True)
     all_muts_aa_full.to_csv('intermediate.csv', index=False, float_format='%6.4f')
+    all_muts_aa_codon_full_csv = all_muts_aa_full.copy(deep=True)
     all_muts_aa_full = all_muts_aa_full.drop(['nts'], axis=1)
-    # sum over synonymous mutations
+    # sum over synonymous mutations. Since deletions look like synonymous mutations, 
+    # they will be removed!
     all_muts_aa_full = all_muts_aa_full.groupby(['pos', 'wt', 'mut']).sum()
+    all_muts_aa_codon_full_csv = all_muts_aa_codon_full_csv.groupby(['pos', 'wt', 'mut', 'nts']).sum()
     all_muts_aa_full.reset_index(inplace=True)
+    all_muts_aa_codon_full_csv.reset_index(inplace=True)
     all_muts_aa_full['organism'] = organism
+    all_muts_aa_codon_full_csv['organism'] = organism
     all_muts_aa_full['gene'], all_muts_aa_full['gene_pos'] = zip(*all_muts_aa_full.apply(gene_name_pos, axis=1))
+    all_muts_aa_codon_full_csv['gene'], all_muts_aa_codon_full_csv['gene_pos'] = zip(*all_muts_aa_codon_full_csv.apply(gene_name_pos, axis=1))
+    all_muts_aa_codon_full_csv.to_csv('all_muts_aa_codon_full.csv', index=False, float_format='%6.4f')
     # keep only the real mutations
     real_muts = all_muts_aa_full[all_muts_aa_full.wt != all_muts_aa_full.mut]
     real_muts = real_muts.sort_values(by=['pos', 'freq'], ascending=[True, False])
