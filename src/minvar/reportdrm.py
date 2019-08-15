@@ -440,7 +440,7 @@ No HIV/HCV read found
     mpd.to_csv(path_or_buf='merged_muts_drm_annotated.csv', index=False)
     logging.info('Shape of raw merged is: %s', str(mpd.shape))
 
-    print('Mutations detected', file=rh)
+    print('\nMutations detected', file=rh)
     print('==================\n', file=rh)
     if org == 'HIV':
         # too complicated with panda, do it by hand
