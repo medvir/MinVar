@@ -490,8 +490,9 @@ def main(read_file=None, max_n_reads=200000):
     SeqIO.write([ref_rec], 'subtype_ref.fasta', 'fasta')
     cns_file = iterate_consensus(filtered_file, 'subtype_ref.fasta')
     logging.info('Consensus in file %s', cns_file)
+    bam_2_trim_file = align_reads(ref=cns_file, reads=filtered_file, out_file='hq_2_cns_before_trim.bam')
     # extract the longest region covered by at least 100 reads and save that
-    cov_start, cov_stop = start_stop_coverage('refcon_sorted.bam')
+    cov_start, cov_stop = start_stop_coverage('hq_2_cns_before_trim.bam')
     all_ref = list(SeqIO.parse(cns_file, 'fasta'))[0]
     covered_dna = str(all_ref.seq[cov_start - 1:cov_stop - 1])
     all_ref.seq = Seq(disambiguate(covered_dna))
