@@ -81,13 +81,13 @@ def compute_min_len(filename):
     return percentile_5 - 2
 
 
-def filter_reads(filename, max_n, min_len=49):
+def filter_reads(filename, max_n, min_len=49, ranseed=313):
     """Use seqtk and Biopython to trim and filter low quality reads."""
     from Bio.SeqIO.QualityIO import FastqGeneralIterator
 
     # run seqtk trimfq to trim low quality ends
     logging.info('Trimming reads with seqtk')
-    r1 = 'seqtk trimfq %s | seqtk sample - %d' % (filename, max_n)
+    r1 = 'seqtk trimfq %s | seqtk sample -s %d - %d' % (filename, ranseed, max_n)
     oh = open('high_quality.fastq', 'w')
     proc = subprocess.Popen(r1, shell=True, stdout=subprocess.PIPE,
                             universal_newlines=True)
@@ -103,12 +103,13 @@ def filter_reads(filename, max_n, min_len=49):
     return oh.name
 
 
-def find_subtype(reads_file, sampled_reads=1000, recomb=False):
+def find_subtype(reads_file, sampled_reads=1000, recomb=False, ranseed=313):
     """Blast a subset of reads against references to infer organism and support for group/subtype."""
     import fileinput
     import warnings
     import pandas as pd
-
+    #print('find_subtype')
+    #print(sampled_reads,recomb ,ranseed)
     if recomb:
         ref_files = [HIV_recomb_references, HCV_recomb_references]
     else:
@@ -126,7 +127,7 @@ def find_subtype(reads_file, sampled_reads=1000, recomb=False):
 
     # sample reads with seqtk and convert to fasta, equivalent to:
     # seqtk sample reads_file n_reads | seqtk seq -A - > sample_hq.fasta
-    cml1 = shlex.split('seqtk sample %s %d' % (reads_file, sampled_reads))
+    cml1 = shlex.split('seqtk sample -s%d %s %d' % (ranseed, reads_file, sampled_reads))
     sample = subprocess.Popen(cml1, stdout=subprocess.PIPE)
     cml2 = shlex.split('seqtk seq -A -')
     with open('sample_hq.fasta', 'w') as oh:
@@ -264,15 +265,16 @@ def phase_variants(reffile, varfile):
     return Seq(''.join(reflist))
 
 
-def make_consensus(ref_file, reads_file, iteration, sampled_reads=10000, mapper='bwa', cons_caller='own'):
+def make_consensus(ref_file, reads_file, iteration, sampled_reads=10000, mapper='bwa', cons_caller='own', ranseed=313):
     """Take reads, align to reference, return consensus file."""
     import glob
 
     out_file = 'cns_%d.fasta' % iteration
-    ranseed = 313 + iteration
+    
+    ranseed += iteration
 
     # sample reads
-    cml = shlex.split('seqtk sample -s %d %s %d'
+    cml = shlex.split('seqtk sample -s%d %s %d'
                       % (ranseed, reads_file, sampled_reads))
     with open('hq_smp.fastq', 'w') as oh:
         subprocess.call(cml, stdout=oh)
@@ -379,14 +381,14 @@ def make_consensus(ref_file, reads_file, iteration, sampled_reads=10000, mapper=
     return out_file, covered_fract
 
 
-def iterate_consensus(reads_file, ref_file):
+def iterate_consensus(reads_file, ref_file, sampled_reads_consensus=10000, ranseed=313):
     """Call make_consensus until convergence or for a maximum number of iterations."""
     logging.info('First consensus iteration')
     iteration = 1
     # consensus from first round is saved into cns_1.fasta
     cns_file_1, new_cov = make_consensus(
         ref_file, reads_file, iteration,
-        sampled_reads=10000, mapper='blast')
+        sampled_reads=sampled_reads_consensus, mapper='blast', ranseed=ranseed)
     try:
         os.rename('calls.vcf.gz', 'calls_%d.vcf.gz' % iteration)
     except FileNotFoundError:
@@ -404,7 +406,7 @@ def iterate_consensus(reads_file, ref_file):
         logging.info('iteration %d', iteration)
         # use cns_1.fasta for further consensus rounds
         new_cons, new_cov = make_consensus('cns_%d.fasta' % (iteration - 1), reads_file, iteration,
-                                           sampled_reads=10000, mapper='bwa')
+                                           sampled_reads=sampled_reads_consensus, mapper='bwa', ranseed=ranseed)
         try:
             os.rename('calls.vcf.gz', 'calls_%d.vcf.gz' % iteration)
         except FileNotFoundError:
@@ -435,17 +437,17 @@ def compute_dist(file1, file2):
     return 100 - float(ident)
 
 
-def main(read_file=None, max_n_reads=200000):
+def main(read_file=None, max_n_reads=200000, start_stop_cov_threshold=20, sampled_reads_consensus=10000, ranseed=313):
     """What the main does."""
     assert os.path.exists(read_file), 'File %s not found' % read_file
 
     min_len = compute_min_len(read_file)
 
     # locally defined filter_reads writes reads into high_quality.fastq
-    filtered_file = filter_reads(read_file, max_n_reads, min_len)
+    filtered_file = filter_reads(read_file, max_n_reads, min_len, ranseed=ranseed)
 
     # infer organism and subtype
-    organism, support_freqs, acc = find_subtype(filtered_file)
+    organism, support_freqs, acc = find_subtype(filtered_file, ranseed=ranseed)
     if support_freqs == {}:
         return None, None, None
     logging.info('%s sequences detected', organism)
@@ -457,7 +459,7 @@ def main(read_file=None, max_n_reads=200000):
     # if support is good, don't even try recombinants
     if max_support < 0.5:
         logging.info('Low support in blast: try recombinant')
-        organism, rec_support_freqs, rec_acc = find_subtype(filtered_file, recomb=True)
+        organism, rec_support_freqs, rec_acc = find_subtype(filtered_file, recomb=True, ranseed=ranseed)
         max_support_rec = max(rec_support_freqs.values())
     # max_support_rec is 0.0, unless explicitely computed
     if max_support_rec > max_support:
@@ -488,10 +490,10 @@ def main(read_file=None, max_n_reads=200000):
     ref_dict = SeqIO.to_dict(SeqIO.parse(sub_file, 'fasta'))
     ref_rec = SeqRecord(ref_dict[s_id].seq, id=best_subtype.split('.')[0], description='')
     SeqIO.write([ref_rec], 'subtype_ref.fasta', 'fasta')
-    cns_file = iterate_consensus(filtered_file, 'subtype_ref.fasta')
+    cns_file = iterate_consensus(filtered_file, 'subtype_ref.fasta') #sampled_reads_consensus, ranseed
     logging.info('Consensus in file %s', cns_file)
     # extract the longest region covered by at least 100 reads and save that
-    cov_start, cov_stop = start_stop_coverage('refcon_sorted.bam')
+    cov_start, cov_stop = start_stop_coverage('refcon_sorted.bam', start_stop_cov_threshold)
     all_ref = list(SeqIO.parse(cns_file, 'fasta'))[0]
     covered_dna = str(all_ref.seq[cov_start - 1:cov_stop - 1])
     all_ref.seq = Seq(disambiguate(covered_dna))

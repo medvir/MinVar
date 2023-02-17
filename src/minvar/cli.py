@@ -42,10 +42,17 @@ parser = argparse.ArgumentParser()
 group1 = parser.add_argument_group('Input files', 'Required input')
 group1.add_argument("-f", "--fastq", default="", type=str, dest="f",
                     help="input reads in fastq format")
+group1.add_argument("-n", "--subsample_consensus", default=10000, type=int, dest="n",
+                    help="number of reads to subsample to create the initial consensus sequence <default: %(default)s>")
+group1.add_argument("-s", "--subsample_randseed", default=313, type=int, dest="s",
+                    help="subsample seed used in <seqtk sample> command <default: %(default)s>")
+group1.add_argument("-c", "--cov_th", default=20, type=int, dest="c",
+                    help="coverage threshold to determine the start and stop positions in the initial constructed consensus sequence <default: %(default)s>")
 group1.add_argument("-r", "--recal", action="store_true",
                     help="turn on recalibration with GATK <default: %(default)s>", default=False)
 group1.add_argument("-k", "--keep", action="store_true",
                     help="keep intermediate files <default: %(default)s>", default=False)
+
 group1.add_argument('-v', '--version', action='version', version=__version__)
 
 # exit so that log file is not written
@@ -66,7 +73,7 @@ def main(args=None):
     logging.info(' '.join(sys.argv))
 
     from minvar import prepare
-    cns_file, prepared_bam, org_found = prepare.main(args.f)
+    cns_file, prepared_bam, org_found = prepare.main(args.f, start_stop_cov_threshold=args.c, sampled_reads_consensus=args.n, ranseed=args.s)
 
     from minvar import callvar
     called_file, called_bam = callvar.main(ref_file=cns_file, bamfile=prepared_bam, caller='lofreq',
