@@ -28,10 +28,10 @@ if __name__ == '__main__':
         os.sys.path.insert(1, dn_dir)
         mod = __import__('minvar')
         sys.modules["minvar"] = mod
-        from common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, mastercomments_version
+        from common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, mastercomments_version, wobbles, AMBIGUITY_threshold
         from Alignment import needle_align
 else:
-    from .common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, mastercomments_version
+    from .common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, mastercomments_version, wobbles, AMBIGUITY_threshold
     from .Alignment import needle_align
 
 cons_B_file = resource_filename(__name__, 'db/HIV/consensus_B.fna')
@@ -67,7 +67,6 @@ cell_colour = {
 # RT = list(SeqIO.parse(os.path.join(db_dir, 'RT.faa'), 'fasta'))[0]
 # integrase = \
 #     list(SeqIO.parse(os.path.join(db_dir, 'integrase.faa'), 'fasta'))[0]
-
 
 def parse_drm():
     """Return drug resistance mutations listed in files db/HIV/masterComments*.txt."""
@@ -209,6 +208,77 @@ def write_sierra_results(handle, mut_file):
           'however only single mutations are reported in the above tables.', file=handle)
     print('\\newpage', file=handle)
 
+def calc_APD(alignment):
+    
+    #go through cons_B column, whenever it is not '-' add to position
+    #go throught amb column whenever it is not '-' add to position
+    APD_ambi_al, APD_cons_al = str(alignment[0].seq), str(alignment[1].seq)
+    assert len(APD_ambi_al) == len(APD_cons_al), '%d - %d' % (len(APD_ambi_al), len(APD_cons_al))
+    APD_ambi_cons_df = pd.DataFrame({ 'cons_B': list(APD_cons_al), 'amb':list(APD_ambi_al)})
+    pos_consB = []
+    pos_amb = []
+    i_consB = 167 
+    i_amb = 0 #??? should it start from starting position of the  mutations_nt_pos_ref_aa.csv
+    for index, row in APD_ambi_cons_df.iterrows():
+        if row['cons_B'] != '-':
+            i_consB += 1
+        pos_consB.append(i_consB)
+        
+        if row['amb'] != '-':
+            i_amb += 1
+        pos_amb.append(i_amb)
+    
+    
+    APD_ambi_cons_df['pos_consB'] = pos_consB
+    APD_ambi_cons_df['pos_amb'] = pos_amb
+            
+    mutations_nt_pos_ref_df = pd.read_csv('merged_mutations_nt.csv')
+    APD_ambi_cons_freq_df = pd.merge(APD_ambi_cons_df, mutations_nt_pos_ref_df, left_on = 'pos_amb', right_on='pos', how='inner')
+    
+    #APD_ambi_cons_freq_df.to_csv('APD_snv.csv')
+    #keep only based on pos_consB 168:1470 
+    APD_ambi_cons_freq_df = APD_ambi_cons_freq_df[(168 <= APD_ambi_cons_freq_df['pos_consB']) & ( APD_ambi_cons_freq_df['pos_consB'] < 1470)]
+    # remove starting and ending '-' in consB
+    for index, row in APD_ambi_cons_freq_df.iterrows():
+        if row['cons_B'] != '-':
+            break
+        else:
+            APD_ambi_cons_freq_df.drop(index, inplace=True)    
+    
+    for index, row in APD_ambi_cons_freq_df[::-1].iterrows():
+        if row['cons_B'] != '-':
+            break
+        else:
+            APD_ambi_cons_freq_df.drop(index, inplace=True) 
+    # remove all '-' and 'N' in amb
+    APD_ambi_cons_freq_df = APD_ambi_cons_freq_df[(APD_ambi_cons_freq_df['amb'] != '-') & (APD_ambi_cons_freq_df['amb'] != 'N')]
+    APD_ambi_cons_freq_df.to_csv('APD_ambi_cons_freq.csv')
+    APD_score = 0
+    idx , ptr2 = 0, 0 
+    amb_pos_count = 0
+    while idx < APD_ambi_cons_freq_df.shape[0]:
+        #pointer2 = idx
+        freq_ls = []
+        while ptr2 < APD_ambi_cons_freq_df.shape[0] and APD_ambi_cons_freq_df.iloc[ptr2]['pos'] == APD_ambi_cons_freq_df.iloc[idx]['pos']:
+            freq_ls.append(APD_ambi_cons_freq_df.iloc[ptr2]['freq'])
+            ptr2 += 1
+        
+        freq_ls.append(1 - sum(freq_ls))
+        freq_ls.sort(reverse = True)
+        max_minority_freq = freq_ls[1]
+        if max_minority_freq >= AMBIGUITY_threshold: # and APD_ambi_cons_freq_df.iloc[ptr2 - 1]['cons_B'] != '-': #and  snv_nogap_ref_df.iloc[pointer2 - 1]['amb'] != '-'
+            assert APD_ambi_cons_freq_df.iloc[ptr2 - 1]['amb'] in wobbles, '%s in %d' % (APD_ambi_cons_freq_df.iloc[ptr2 - 1]['amb'], ptr2 - 1)
+            diversity_contribution_sum = 0
+            amb_pos_count += 1
+            for nc_freq in freq_ls:
+                diversity_contribution_sum += (nc_freq * (1 - nc_freq))
+        
+            APD_score += diversity_contribution_sum
+        idx = ptr2
+    #print('APD function is calculated for %d number of positions' %position_counter)
+    #print(position_counter)    
+    return APD_score, APD_ambi_cons_freq_df.drop_duplicates(subset='pos_amb', keep='first').shape[0], amb_pos_count
+
 
 def write_ambig_score(handle):
     """Read ambiguous sequence, compute and write ambiguity score to handle.
@@ -223,6 +293,7 @@ def write_ambig_score(handle):
     amb_target = str(list(SeqIO.parse(cons_B_file, 'fasta'))[0].seq[168:1470])
     needle_align('cns_ambiguous.fasta', 'asis:%s'% amb_target, 'ambi_aln.fasta', go=10., ge=.5)
     alignment = AlignIO.read('ambi_aln.fasta', 'fasta')
+    
     start = None
     i = 0
     while start is None:
@@ -235,6 +306,14 @@ def write_ambig_score(handle):
     rlen = len(target)
     score = float(sum((1 for nt in target if nt not in set(['A', 'C', 'G', 'T']))))
     print('Score: %4.2f %% (%d of %d total nucleotides).\n\n' % (100 * score / rlen, score, rlen), file=handle)
+    
+    #APD_alignment = AlignIO.read('ambi_aln.fasta', 'fasta')
+    
+    APD_score, APD_len, APD_pos = calc_APD(alignment)
+    #APD_score, APD_len = calc_APD(APD_snv_df)
+    assert APD_len == rlen, 'APD length is %d different from %d' % (APD_len, rlen)
+    #APD_score = (APD_score / rlen)
+    print('APD Score: %4.6f (%d of %d total nucleotides).\n\n' % (APD_score / rlen, APD_pos, APD_len), file=handle)
     print('Region to compute ambiguity score is 1302 bp, reached high coverage on %d.\n\n' % rlen, file=handle)
 
 # def write_header_HIV(handle, drms=None):

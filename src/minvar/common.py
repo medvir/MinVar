@@ -9,6 +9,7 @@ wobbles = {v: k for k, v in d2a.items()}
 MIN_FRACTION = 0.015
 RAW_DEPTH_THRESHOLD = 50
 coverage_threshold = 100
+AMBIGUITY_threshold = 0.15
 
 # This must be updated when new masterComments files are downloaded into src/minvar/db/HIV
 mastercomments_version = 'HIVdb version 8.4 (last updated 2017-06-16)'
