@@ -18,16 +18,10 @@ import argparse
 import os
 import sys
 
-from pkg_resources import (get_distribution, DistributionNotFound, resource_exists)
-# resource_filename)
+from importlib.metadata import version
 
-try:
-    __version__ = get_distribution('minvar').version
-    HCV_references = resource_exists(__name__, 'db/HCV/subtype_references.fasta')
+__version__ = version('minvar')
 
-except DistributionNotFound:
-    # package is not installed
-    pass
 
 files_to_remove = [
     'calls_1.vcf.gz', 'cnsref.amb', 'cnsref.ann', 'cnsref.bwt', 'hq_smp.fastq',
