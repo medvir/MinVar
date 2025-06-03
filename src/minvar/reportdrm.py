@@ -17,7 +17,8 @@ import csv
 import logging
 import shlex
 import subprocess
-from pkg_resources import resource_filename
+from importlib import resources
+
 from Bio import SeqIO, AlignIO
 
 import pandas as pd
@@ -34,7 +35,7 @@ else:
     from .common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, mastercomments_version, wobbles, AMBIGUITY_threshold
     from .Alignment import needle_align
 
-cons_B_file = resource_filename(__name__, 'db/HIV/consensus_B.fna')
+cons_B_file = resources.files(__name__).joinpath('db/HIV/consensus_B.fna')
 
 # aminoacid one-letter code
 aa_set = set('GPAVLIMCFYWHKRQNEDST')

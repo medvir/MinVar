@@ -17,8 +17,12 @@ Why does this file exist, and why not put this in __main__?
 import argparse
 import os
 import sys
-
 from importlib.metadata import version
+
+from minvar import annotate
+from minvar import callvar
+from minvar import prepare
+from minvar import reportdrm
 
 __version__ = version('minvar')
 
@@ -59,17 +63,14 @@ def main(args=None):
     logging.basicConfig(filename='minvar.log', level=logging.INFO, format=log_format, datefmt='%Y/%m/%d %H:%M:%S')
     logging.info(' '.join(sys.argv))
 
-    from minvar import prepare
+    
     cns_file, prepared_bam, org_found = prepare.main(args.f)
 
-    from minvar import callvar
     called_file, called_bam = callvar.main(ref_file=cns_file, bamfile=prepared_bam, caller='lofreq',
                                            recalibrate=args.recal)
 
-    from minvar import annotate
     annotate.main(vcf_file=called_file, ref_file=cns_file, bam_file=called_bam, organism=org_found)
 
-    from minvar import reportdrm
     reportdrm.main(org=org_found, subtype_file='subtype_evidence.csv', fastq=args.f, version=__version__)
 
     if not args.keep:

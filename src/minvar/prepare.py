@@ -19,11 +19,11 @@ import shlex
 import shutil
 import subprocess
 import sys
+from importlib import resources
 
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-from pkg_resources import resource_filename
 
 dn_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if __name__ == '__main__':
@@ -37,12 +37,12 @@ else:
     from .common import hcv_map, hiv_map, org_dict, wobbles
     from .stats import (genome_coverage, start_stop_coverage)
 
-HCV_references = resource_filename(__name__, 'db/HCV/subtype_references.fasta')
-HIV_references = resource_filename(__name__, 'db/HIV/subtype_references.fasta')
+HCV_references = resources.files(__name__).joinpath('db/HCV/subtype_references.fasta')
+HIV_references = resources.files(__name__).joinpath('db/HIV/subtype_references.fasta')
 HCV_recomb_references = \
-    resource_filename(__name__, 'db/HCV/recomb_references.fasta')
+    resources.files(__name__).joinpath('db', 'HCV', 'recomb_references.fasta')
 HIV_recomb_references = \
-    resource_filename(__name__, 'db/HIV/recomb_references.fasta')
+    resources.files(__name__).joinpath('db', 'HCV', 'recomb_references.fasta')
 blast2sam_exe = 'blast2sam'
 
 qual_thresh = 20
