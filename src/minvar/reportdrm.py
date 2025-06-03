@@ -151,7 +151,7 @@ def write_sierra_results(handle, mut_file):
     ptn = ' + '.join(mutations['pattern'])
     with open('pattern.txt', 'w') as h:
         h.write(ptn + '\n')
-    cml = shlex.split('sierrapy patterns pattern.txt -o o.json')
+    cml = shlex.split('sierrapy patterns pattern.txt --no-sharding -o o.json')
     logging.debug(cml)
     subprocess.call(cml)
     with open('o.json') as h:
