@@ -149,7 +149,7 @@ def parsevar(vcf_file, ref_seq):
     # ref_seq = list(SeqIO.parse(ref_file, 'fasta'))[0]
     # frame, nt_framed, aa_framed = find_frame(ref_seq)
     ref_nt = str(ref_seq)
-    vcf_mutations = pd.DataFrame(columns=['wt', 'pos', 'mut', 'freq'])
+    vcf_mutations = []
     # vcf_mutations = vcf_mutations.set_index(['gene', 'pos', 'mut'])
     # now parses the variants
     for vc_line in vc_lines:
@@ -187,7 +187,8 @@ def parsevar(vcf_file, ref_seq):
                 #     pm_here = {'wt': b[0], 'pos': pos + i, 'mut': b[1], 'freq': float(alt_f)}
                 #     vcf_mutations = vcf_mutations.append(pm_here, ignore_index=True)
             pm_here = {'wt': wt_nt, 'pos': pos, 'mut': alt_nt, 'freq': float(alt_f)}
-            vcf_mutations = vcf_mutations.append(pm_here, ignore_index=True)
+            vcf_mutations.append(pm_here)
+    vcf_mutations = pd.DataFrame(vcf_mutations)
 
     vcf_mutations['pos'] = vcf_mutations['pos'].astype(int)
     return vcf_mutations
@@ -399,7 +400,7 @@ def df_2_sequence(df_in):
     """
     # select row with max frequency for each position
     if 'freq' in df_in.columns:
-        max_freq_idx = df_in.groupby(['pos'])['freq'].transform(max) == df_in['freq']
+        max_freq_idx = df_in.groupby('pos')['freq'].transform("max") == df_in['freq']
         df_in = df_in[max_freq_idx]
     # this is needed for positions where frequency is 0.5/0.5
     df_in = df_in.groupby('pos').first().reset_index()

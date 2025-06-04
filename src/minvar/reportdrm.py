@@ -15,7 +15,9 @@ import os
 import configparser
 import csv
 import logging
+import re
 import shlex
+import shutil
 import subprocess
 from importlib import resources
 
@@ -60,7 +62,7 @@ cell_colour = {
 # amminoacid sequences from files in db directory
 # dn_dir = os.path.dirname(__file__)
 # db_dir = os.path.abspath(os.path.join(dn_dir, 'db'))
-# HCV_references = resource_filename(__name__, 'db/HCV/subtype_references.fasta')
+# HCV_references = resources.files(__name__).joinpath('db/HCV/subtype_references.fasta')
 
 
 # prot = \
@@ -73,7 +75,7 @@ def parse_drm():
     """Return drug resistance mutations listed in files db/HIV/masterComments*.txt."""
     df_list = []
     genes = ['protease', 'RT', 'integrase']
-    HIVdb_comment_files = [resource_filename(__name__, 'db/HIV/masterComments_%s.txt' % p)
+    HIVdb_comment_files = [resources.files(__name__).joinpath('db/HIV/masterComments_%s.txt' % p)
                            for p in ('PI', 'RTI', 'INI')]
     for gene, drm_file in zip(genes, HIVdb_comment_files):
         d1 = pd.read_table(drm_file, header=0, names=['pos', 'mut', 'category', 'comment'])
@@ -86,7 +88,7 @@ def parse_drm():
 
 def parse_ras():
     """Return position of RAS listed in file db/HCV/all_mutations_position.csv."""
-    ras_file = resource_filename(__name__, 'db/HCV/all_mutations_position.csv')
+    ras_file = resources.files(__name__).joinpath('db/HCV/all_mutations_position.csv')
     ras_positions = pd.read_csv(ras_file)
     ras_positions['CATEGORY'] = 'RAS'
     return ras_positions
@@ -620,10 +622,9 @@ def convert_2_pdf(sample_id='', version='unknown'):
     :param sample_id: sample name
     :param version: MinVar version
     """
-    import shutil
 
     # copy template to current directory
-    tmpl_file = resource_filename(__name__, 'db/template.tex')
+    tmpl_file = resources.files(__name__).joinpath('db/template.tex')
     shutil.copy(tmpl_file, os.getcwd())
     # write contact.tex to be included in template
     write_contact_file(sample_id=sample_id, version=version)
@@ -637,7 +638,6 @@ def convert_2_pdf(sample_id='', version='unknown'):
 
 def main(org=None, subtype_file=None, fastq='unknown', version='unknown'):
     """What the main does."""
-    import re
 
     fastq_base = os.path.basename(fastq)
     try:
