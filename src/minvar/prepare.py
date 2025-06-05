@@ -42,7 +42,7 @@ HIV_references = resources.files(__name__).joinpath('db/HIV/subtype_references.f
 HCV_recomb_references = \
     resources.files(__name__).joinpath('db', 'HCV', 'recomb_references.fasta')
 HIV_recomb_references = \
-    resources.files(__name__).joinpath('db', 'HCV', 'recomb_references.fasta')
+    resources.files(__name__).joinpath('db', 'HIV', 'recomb_references.fasta')
 blast2sam_exe = 'blast2sam'
 
 qual_thresh = 20
