@@ -50,10 +50,10 @@ if __name__ == '__main__':
         os.sys.path.insert(1, dn_dir)
         mod = __import__('minvar')
         sys.modules["minvar"] = mod
-        from common import h77_map, consensus_B_map, d2a, coverage_threshold, AMBIGUITY_threshold
+        from common import h77_map, consensus_B_map, d2a, coverage_threshold, AMBIGUITY_THRESHOLD
         from Alignment import needle_align, alignfile2dict
 else:
-    from .common import h77_map, consensus_B_map, d2a, coverage_threshold, AMBIGUITY_threshold
+    from .common import h77_map, consensus_B_map, d2a, coverage_threshold, AMBIGUITY_THRESHOLD
     from .Alignment import needle_align, alignfile2dict
 
 
@@ -417,7 +417,7 @@ def df_2_ambiguous_sequence(df_in, cov_df=None):
     """
     assert 'freq' in df_in.columns
     # select calls with freq > 15%
-    df_in = df_in[df_in['freq'] >= AMBIGUITY_threshold]
+    df_in = df_in[df_in['freq'] >= AMBIGUITY_THRESHOLD]
     # aggregate calls for the same position
     all_nt = df_in.groupby(['pos']).agg({'mut': lambda x: ''.join(sorted(x))})
     # create a columng of ambiguous bases * so insertion is not considered because only the first nc is returned
