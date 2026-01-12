@@ -37,7 +37,7 @@ else:
     from .common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, mastercomments_version, wobbles, APD_THRESHOLD
     from .Alignment import needle_align
 
-cons_B_file = resources.files(__name__).joinpath('db/HIV/consensus_B.fna')
+cons_B_file = resources.files('minvar').joinpath('db/HIV/consensus_B.fna')
 
 # aminoacid one-letter code
 aa_set = set('GPAVLIMCFYWHKRQNEDST')
@@ -211,7 +211,7 @@ def write_sierra_results(handle, mut_file):
           'however only single mutations are reported in the above tables.', file=handle)
     print('\\newpage', file=handle)
 
-def calc_APD(alignment):
+def calc_APD(alignment, sample_id='ID'):
     
     #go through cons_B column, whenever it is not '-' add to position
     #go throught amb column whenever it is not '-' add to position
@@ -235,9 +235,9 @@ def calc_APD(alignment):
     APD_ambi_cons_df['pos_consB'] = pos_consB
     APD_ambi_cons_df['pos_amb'] = pos_amb
             
-    mutations_nt_pos_ref_df = pd.read_csv('merged_mutations_nt.csv')
+    mutations_nt_pos_ref_df = pd.read_csv(f'merged_mutations_nt_{sample_id}.csv')
     APD_ambi_cons_freq_df = pd.merge(APD_ambi_cons_df, mutations_nt_pos_ref_df, left_on = 'pos_amb', right_on='pos', how='inner')
-    APD_ambi_cons_freq_df.to_csv('APD_ambi_cons_freq.csv')
+    APD_ambi_cons_freq_df.to_csv(f'APD_ambi_cons_freq_{sample_id}.csv')
     
     #keep only based on pos_consB 168:1470 
     APD_ambi_cons_freq_df = APD_ambi_cons_freq_df[(168 <= APD_ambi_cons_freq_df['pos_consB']) & ( APD_ambi_cons_freq_df['pos_consB'] < 1470)]
@@ -258,7 +258,7 @@ def calc_APD(alignment):
             APD_ambi_cons_freq_3rdcodon_df.drop(index, inplace=True) 
     # remove all '-' and 'N' in amb
     APD_ambi_cons_freq_3rdcodon_df = APD_ambi_cons_freq_3rdcodon_df[(APD_ambi_cons_freq_3rdcodon_df['amb'] != '-') & (APD_ambi_cons_freq_3rdcodon_df['amb'] != 'N')]
-    APD_ambi_cons_freq_3rdcodon_df.to_csv('APD_ambi_cons_freq_3rdcodon.csv')
+    APD_ambi_cons_freq_3rdcodon_df.to_csv(f'APD_ambi_cons_freq_3rdcodon_{sample_id}.csv')
     APD_score = 0
     idx , ptr2 = 0, 0 
     amb_pos_count = 0
@@ -285,7 +285,7 @@ def calc_APD(alignment):
     return APD_score, APD_ambi_cons_freq_3rdcodon_df.drop_duplicates(subset='pos_amb', keep='first').shape[0], amb_pos_count
 
 
-def write_ambig_score(handle):
+def write_ambig_score(handle, sample_id='ID'):
     """Read ambiguous sequence, compute and write ambiguity score to handle.
 
     Read the sequence from ``cns_ambiguous.fasta``, align it to PRRT up to amminoacid 335, extract
@@ -296,9 +296,9 @@ def write_ambig_score(handle):
     print('\nAmbiguity score', file=handle)
     print('---------------\n', file=handle)
     amb_target = str(list(SeqIO.parse(cons_B_file, 'fasta'))[0].seq[168:1470])
-    needle_align('cns_ambiguous.fasta', 'asis:%s'% amb_target, 'ambi_aln.fasta', go=10., ge=.5)
-    alignment = AlignIO.read('ambi_aln.fasta', 'fasta')
-    
+    needle_align(f'cns_ambiguous_{sample_id}.fasta', 'asis:%s'% amb_target, f'ambi_aln_{sample_id}.fasta', go=10., ge=.5)
+    alignment = AlignIO.read(f'ambi_aln_{sample_id}.fasta', 'fasta')
+
     start = None
     i = 0
     while start is None:
@@ -314,7 +314,7 @@ def write_ambig_score(handle):
     print('Region to compute ambiguity score is 1302 bp, reached high coverage on %d.\n\n' % rlen, file=handle)
     #APD_alignment = AlignIO.read('ambi_aln.fasta', 'fasta')
     
-    APD_score, APD_len, APD_pos = calc_APD(alignment)
+    APD_score, APD_len, APD_pos = calc_APD(alignment, sample_id=sample_id)
     #assert APD_len == rlen, 'APD length is %d different from %d' % (APD_len, rlen)
     print('\nAverage pairwise diversity (APD) score', file=handle)
     print('---------------\n', file=handle)
@@ -483,7 +483,7 @@ threshold and a minimum depth of %d reads.
     print(run_info, file=handle)
 
 
-def write_md(org=None, mut_file='final.csv', subtype_file='subtype_evidence.csv', sample_id=''):
+def write_md(org=None, mut_file='final.csv', subtype_file='subtype_evidence.csv', sample_id='ID'):
     """Orchestrate the writing of the markdown file.
 
     :param org: HIV or HCV
@@ -492,7 +492,7 @@ def write_md(org=None, mut_file='final.csv', subtype_file='subtype_evidence.csv'
     :param sample_id: will be written in the title of the report
     """
     logging.info('Writing report in markdown')
-    rh = open('report.md', 'w')
+    rh = open(f'report_{sample_id}.md', 'w')
     print('Sample %s: drug resistance mutations report' % sample_id, file=rh)
     print('============================================\n', file=rh)
     # print('Drug resistance mutations detected by NGS sequencing', file=rh)
@@ -520,14 +520,14 @@ No HIV/HCV read found
     logging.info('Parsed DRM from database, shape: %s', str(resistance_mutations.shape))
     mpd = pd.merge(mutation_detected, resistance_mutations, how='left',
                    on=['gene', 'pos'])
-    mpd.to_csv(path_or_buf='merged_muts_drm_annotated.csv', index=False)
+    mpd.to_csv(path_or_buf=f'merged_muts_drm_annotated_{sample_id}.csv', index=False)
     logging.info('Shape of raw merged is: %s', str(mpd.shape))
 
     print('\nMutations detected', file=rh)
     print('==================\n', file=rh)
     if org == 'HIV':
         # too complicated with panda, do it by hand
-        drms = parse_merged('merged_muts_drm_annotated.csv')
+        drms = parse_merged(f'merged_muts_drm_annotated_{sample_id}.csv')
         logging.info('Shape of elaborated merged is: %s', str(drms.shape))
         # os.remove('merged_muts.csv')
 
@@ -538,7 +538,7 @@ No HIV/HCV read found
         drms = drms[cols]
         drms.sort_values(by=['gene', 'pos', 'freq'], inplace=True,
                          ascending=[True, True, False])
-        drms.to_csv('annotated_DRM.csv', index=False)
+        drms.to_csv(f'annotated_DRM_{sample_id}.csv', index=False)
 
         print('Mutation lists from %s.\n' % mastercomments_version, file=rh)
         write_run_info(rh)
@@ -575,11 +575,11 @@ No HIV/HCV read found
                     '|{: ^10}|{: ^10}|{: ^15}|{: ^20}|'.format(int(row['pos']), row['mut'], int_freq, mut_cat),
                     file=rh)
             print('\n', file=rh)
-        write_ambig_score(rh)
+        write_ambig_score(rh, sample_id=sample_id)
     elif org == 'HCV':
         write_header_HCV(rh, resistance_mutations)
         write_run_info(rh)
-        drms = pd.read_csv('merged_muts_drm_annotated.csv')
+        drms = pd.read_csv(f'merged_muts_drm_annotated_{sample_id}.csv')
         drms = drms.fillna("unknown")
         drms = drms[drms['CATEGORY'] == 'RAS']
         # logging.info('Shape of annotated_mutations is: %s', str(mutation_detected.shape))
@@ -630,22 +630,24 @@ def convert_2_pdf(sample_id='', version='unknown'):
     # write contact.tex to be included in template
     write_contact_file(sample_id=sample_id, version=version)
     logging.info('Converting markdown to pdf with pandoc')
-    pand_cml = 'pandoc --template=./template.tex report.md -o report.pdf'
+    pand_cml = f'pandoc --template=./template.tex report_{sample_id}.md -o report_{sample_id}.pdf'
     logging.debug(pand_cml)
     subprocess.call(pand_cml, shell=True)
     os.remove('./template.tex')
     os.remove('contact.tex')
 
 
-def main(org=None, subtype_file=None, fastq='unknown', version='unknown'):
+def main(org=None, subtype_file=None, fastq='unknown', version='unknown', sample_id="ID"):
     """What the main does."""
 
-    fastq_base = os.path.basename(fastq)
-    try:
-        sample_id = re.search(r'(.*)_S\d*', fastq_base).group(1)
-    except AttributeError:
-        sample_id = 'unknown'
-    write_md(org=org, mut_file='final.csv', subtype_file=subtype_file, sample_id=sample_id)
+    if sample_id == "ID" or sample_id == "unknown":
+        fastq_base = os.path.basename(fastq)
+        try:
+            sample_id = re.search(r'(.*)_S\d*', fastq_base).group(1)
+        except AttributeError:
+            sample_id = 'unknown'
+
+    write_md(org=org, mut_file=f'final_{sample_id}.csv', subtype_file=subtype_file, sample_id=sample_id)
     convert_2_pdf(sample_id=sample_id, version=version)
 
 

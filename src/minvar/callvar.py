@@ -59,14 +59,14 @@ translation_table = {
 info_fields = {}
 
 
-def recalibrate_qualities(ref_file, bamfile, platform="ILLUMINA"):
+def recalibrate_qualities(ref_file, bamfile, sample_id, platform="ILLUMINA"):
     """Invoke GATK BaseRecalibrator, also calling some high confidence variants.
 
     Follows vipr by Andreas Wilm.
     """
     bamstem, bamext = os.path.splitext(bamfile)
     assert bamext == '.bam', bamext
-    recalfile = '%s_recal.bam' % bamstem
+    recalfile = f'{bamstem}_{sample_id}_recal.bam'
     if os.path.exists(recalfile):
         logging.debug('file %s exists, not overwriting it', recalfile)
         return recalfile
@@ -123,14 +123,14 @@ def recalibrate_qualities(ref_file, bamfile, platform="ILLUMINA"):
     return recalfile
 
 
-def indelqual(ref_file, bamfile):
+def indelqual(ref_file, bamfile, sample_id):
     """Use lofreq indelqual to insert indel qualities into bamfile.
 
     This allows calling indels and is an alternative to GATK BaseRecalibrator.
     """
     bamstem, bamext = os.path.splitext(bamfile)
     assert bamext == '.bam', bamext
-    recalfile = '%s_recal.bam' % bamstem
+    recalfile = f'{bamstem}_{sample_id}_recal.bam'
     cml = shlex.split('lofreq indelqual --dindel -f %s -o %s %s' % (ref_file, recalfile, bamfile))
     subprocess.call(cml)
     # needs reindexing
@@ -225,7 +225,7 @@ def call_variants(ref_file=None, bamfile=None, parallel=True, n_regions=8,
 
 
 def main(ref_file=None, bamfile=None, parallel=True, n_regions=6,
-         caller='lofreq', recalibrate=True):
+         caller='lofreq', recalibrate=True, sample_id="ID"):
     """What a main does."""
     if ref_file is None:
         return None, None
@@ -235,19 +235,19 @@ def main(ref_file=None, bamfile=None, parallel=True, n_regions=6,
     bamstem, bamext = os.path.splitext(bamfile)
     assert bamext == '.bam', bamext
 
-    called_file = '%s.vcf' % bamstem
+    called_file = f'{bamstem}_{sample_id}.vcf'
     if os.path.exists(called_file):
         logging.info('vcf file exists, not calling new variants')
         return called_file
 
     if recalibrate:
         logging.info('recalibrating base qualities')
-        recalfile = recalibrate_qualities(ref_file, bamfile)
+        recalfile = recalibrate_qualities(ref_file, bamfile, sample_id)
     else:
         logging.info('base qualities will not be recalibrated')
         if caller == 'lofreq':
             logging.info('indel qualities introduced with lofreq')
-            recalfile = indelqual(ref_file, bamfile)
+            recalfile = indelqual(ref_file, bamfile, sample_id)
         else:
             logging.info('indel qualities will not be introduced')
             recalfile = bamfile

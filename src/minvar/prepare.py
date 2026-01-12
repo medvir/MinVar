@@ -37,12 +37,12 @@ else:
     from .common import hcv_map, hiv_map, org_dict, wobbles
     from .stats import (genome_coverage, start_stop_coverage)
 
-HCV_references = resources.files(__name__).joinpath('db/HCV/subtype_references.fasta')
-HIV_references = resources.files(__name__).joinpath('db/HIV/subtype_references.fasta')
+HCV_references = resources.files('minvar').joinpath('db/HCV/subtype_references.fasta')
+HIV_references = resources.files('minvar').joinpath('db/HIV/subtype_references.fasta')
 HCV_recomb_references = \
-    resources.files(__name__).joinpath('db', 'HCV', 'recomb_references.fasta')
+    resources.files('minvar').joinpath('db', 'HCV', 'recomb_references.fasta')
 HIV_recomb_references = \
-    resources.files(__name__).joinpath('db', 'HIV', 'recomb_references.fasta')
+    resources.files('minvar').joinpath('db', 'HIV', 'recomb_references.fasta')
 blast2sam_exe = 'blast2sam'
 
 qual_thresh = 20
@@ -264,7 +264,7 @@ def phase_variants(reffile, varfile):
     return Seq(''.join(reflist))
 
 
-def make_consensus(ref_file, reads_file, iteration, sampled_reads=10000, mapper='bwa', cons_caller='own'):
+def make_consensus(ref_file, reads_file, iteration, sampled_reads=10000, mapper='bwa', cons_caller='own', sample_id='ID'):
     """Take reads, align to reference, return consensus file."""
     import glob
 
@@ -373,20 +373,20 @@ def make_consensus(ref_file, reads_file, iteration, sampled_reads=10000, mapper=
         cml = shlex.split('bgzip -f calls.vcf')
         subprocess.call(cml)
 
-    phased_rec = SeqRecord(phased_seq, id='sample_consensus', description='')
+    phased_rec = SeqRecord(phased_seq, id=f'sample_consensus_{sample_id}', description='')
     SeqIO.write(phased_rec, out_file, 'fasta')
     # del output
     return out_file, covered_fract
 
 
-def iterate_consensus(reads_file, ref_file):
+def iterate_consensus(reads_file, ref_file, sample_id):
     """Call make_consensus until convergence or for a maximum number of iterations."""
     logging.info('First consensus iteration')
     iteration = 1
     # consensus from first round is saved into cns_1.fasta
     cns_file_1, new_cov = make_consensus(
         ref_file, reads_file, iteration,
-        sampled_reads=10000, mapper='blast')
+        sampled_reads=10000, mapper='blast', sample_id=sample_id)
     try:
         os.rename('calls.vcf.gz', 'calls_%d.vcf.gz' % iteration)
     except FileNotFoundError:
@@ -404,7 +404,7 @@ def iterate_consensus(reads_file, ref_file):
         logging.info('iteration %d', iteration)
         # use cns_1.fasta for further consensus rounds
         new_cons, new_cov = make_consensus('cns_%d.fasta' % (iteration - 1), reads_file, iteration,
-                                           sampled_reads=10000, mapper='bwa')
+                                           sampled_reads=10000, mapper='bwa', sample_id=sample_id)
         try:
             os.rename('calls.vcf.gz', 'calls_%d.vcf.gz' % iteration)
         except FileNotFoundError:
@@ -435,7 +435,7 @@ def compute_dist(file1, file2):
     return 100 - float(ident)
 
 
-def main(read_file=None, max_n_reads=200000):
+def main(read_file=None, max_n_reads=200000, sample_id="ID"):
     """What the main does."""
     assert os.path.exists(read_file), 'File %s not found' % read_file
 
@@ -480,15 +480,16 @@ def main(read_file=None, max_n_reads=200000):
     sorted_freqs = sorted(frequencies, key=frequencies.get, reverse=True)
     best_subtype = sorted_freqs[0]
 
-    with open('subtype_evidence.csv', 'w') as oh:
+    with open(f'subtype_evidence_{sample_id}.csv', 'w') as oh:
         for k in sorted_freqs:
             if frequencies[k]:
                 print('%s,%5.4f' % (k, frequencies[k]), file=oh)
     logging.info('Looking for best reference in file %s', sub_file)
     ref_dict = SeqIO.to_dict(SeqIO.parse(sub_file, 'fasta'))
     ref_rec = SeqRecord(ref_dict[s_id].seq, id=best_subtype.split('.')[0], description='')
-    SeqIO.write([ref_rec], 'subtype_ref.fasta', 'fasta')
-    cns_file = iterate_consensus(filtered_file, 'subtype_ref.fasta')
+    subtype_ref_name = f'subtype_ref_{sample_id}.fasta'
+    SeqIO.write([ref_rec], subtype_ref_name, 'fasta')
+    cns_file = iterate_consensus(filtered_file, subtype_ref_name, sample_id)
     logging.info('Consensus in file %s', cns_file)
     bam_2_trim_file = align_reads(ref=cns_file, reads=filtered_file, out_file='hq_2_cns_before_trim.bam')
     # extract the longest region covered by at least 100 reads and save that
@@ -497,13 +498,14 @@ def main(read_file=None, max_n_reads=200000):
     covered_dna = str(all_ref.seq[cov_start - 1:cov_stop - 1])
     all_ref.seq = Seq(disambiguate(covered_dna))
     logging.info('writing an unambiguous sequence of length %d to cns_final.fasta', len(all_ref.seq))
-    SeqIO.write(all_ref, 'cns_final.fasta', 'fasta')
-    cml = shlex.split('samtools faidx cns_final.fasta')
+    cns_final_name = f'cns_final_{sample_id}.fasta'
+    SeqIO.write(all_ref, cns_final_name, 'fasta')
+    cml = shlex.split(f'samtools faidx {cns_final_name}')
     subprocess.call(cml)
 
-    prepared_file = align_reads(ref='cns_final.fasta', reads=filtered_file, out_file='hq_2_cns_final.bam')
+    prepared_file = align_reads(ref=cns_final_name, reads=filtered_file, out_file='hq_2_cns_final.bam')
 
-    return 'cns_final.fasta', prepared_file, organism
+    return cns_final_name, prepared_file, organism
 
 
 if __name__ == "__main__":

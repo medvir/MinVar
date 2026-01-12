@@ -14,3 +14,4 @@ minvarenv/
 .cache/
 .vscode/
 docs/_site/
+.venv/

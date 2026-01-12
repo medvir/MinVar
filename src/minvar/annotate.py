@@ -234,7 +234,7 @@ def merge_mutations(cns_muts, vcf_muts):
     return merged
 
 
-def phase_mutations(bam_file, start, end):
+def phase_mutations(bam_file, start, end, sample_id):
     """Phase mutations affecting the same codon.
 
     If mutations appear on the same codon, it checks on the reads whether they
@@ -244,8 +244,9 @@ def phase_mutations(bam_file, start, end):
     logging.debug('looking for mutations on the same codon to be phased')
     haps = []
     # coverage = 0
+    ref_name = f'sample_consensus_{sample_id}'
     cml = shlex.split(
-        'samtools view %s sample_consensus:%d-%d' % (bam_file, start, end))
+        'samtools view %s %s:%d-%d' % (bam_file, ref_name, start, end))
     proc = subprocess.Popen(cml, stdout=subprocess.PIPE,
                             universal_newlines=True)
     with proc.stdout as handle:
@@ -270,7 +271,7 @@ def phase_mutations(bam_file, start, end):
     return haps
 
 
-def compute_org_mutations(aa_sequence, org_found):
+def compute_org_mutations(aa_sequence, org_found, sample_id):
     """Compute mutation profile and mapping of a protein sequence.
 
     This function takes a protein sequence aa_sequence, aligns it to
@@ -289,8 +290,8 @@ def compute_org_mutations(aa_sequence, org_found):
     elif org_found == 'HCV':
         org_ref = h77_aa_seq
 
-    needle_align('asis:%s' % org_ref, 'asis:%s' % aa_sequence, 'sample_vs_wt.fasta', go=40., ge=4.)
-    alhr = alignfile2dict(['sample_vs_wt.fasta'])
+    needle_align('asis:%s' % org_ref, 'asis:%s' % aa_sequence, f'sample_vs_wt_{sample_id}.fasta', go=40., ge=4.)
+    alhr = alignfile2dict([f'sample_vs_wt_{sample_id}.fasta'])
     alih = alhr['asis']['asis']
     alih.summary()
     if 3 * alih.mismatches > alih.ident:
@@ -446,7 +447,7 @@ def add_coverage_2_merged(merged, coverage_df):
     merged_w_cov = pd.merge(merged, coverage_df[['pos', 'coverage']], on='pos', how='left')    
     return merged_w_cov
 
-def nt_freq_2_aa_freq(df_nt, frame, bam_file=None):
+def nt_freq_2_aa_freq(df_nt, frame, bam_file=None, sample_id='ID'):
     """Compute aminoacid mutations from a DataFrame of nucleotide mutations.
 
     Nucleotides passed are expected to be on the same codon.
@@ -504,7 +505,7 @@ def nt_freq_2_aa_freq(df_nt, frame, bam_file=None):
         return [codon_number] * len(freqs), aas, freqs, combinations
     else:
         logging.info('phasing needed in codon %d', codon_number)
-        haps = phase_mutations(bam_file, min_pos, max_pos)
+        haps = phase_mutations(bam_file, min_pos, max_pos, sample_id)
         aas = [translation_table.get(h, '*') for h in haps.mut.tolist()]
         return [codon_number] * haps.shape[0], aas, haps.freq.tolist(), haps.mut.tolist()
 
@@ -518,7 +519,7 @@ def gene_name_pos(df_in):
 
 
 def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_file='hq_2_cns_final_recal.bam',
-         organism='HCV'):
+         organism='HCV', sample_id="ID"):
     """What the main does."""
     if vcf_file is None:
         for fname in ['merged_muts_drm_annotated.csv', 'cns_max_freq.fasta']:
@@ -543,18 +544,22 @@ def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_fi
     coverage_df = get_coverage(bam_file)
     merged_with_coverage = add_coverage_2_merged(merged,coverage_df)
     # merged_with_coverage contains four columns: variant, frequency, position of the sample consensus and coverage
-    merged_with_coverage.to_csv('merged_mutations_nt.csv', index=False, float_format='%6.4f')  
+    merged_with_coverage.to_csv(f'merged_mutations_nt_{sample_id}.csv', index=False, float_format='%6.4f')  
     
     logging.info('save consensus sequence with wobbles to file')
     ambi_cns = Seq(df_2_ambiguous_sequence(merged, coverage_df))
     assert len(ambi_cns) == len(ref_nt), '%d - %d' % (len(ambi_cns), len(ref_nt))
-    SeqIO.write(SeqRecord(ambi_cns, id='ambiguous_consensus', description=''), 'cns_ambiguous.fasta', 'fasta')
+    SeqIO.write(SeqRecord(
+        ambi_cns, id=f'ambiguous_consensus_{sample_id}', description=''
+        ), f'cns_ambiguous_{sample_id}.fasta', 'fasta')
 
     logging.info('save max frequency sequence to file')
     # generally slightly different from consensus reference
     max_freq_cns = Seq(df_2_sequence(merged))
     assert len(max_freq_cns) == len(ref_nt), '%d - %d' % (len(max_freq_cns), len(ref_nt))
-    SeqIO.write(SeqRecord(max_freq_cns, id='max_freq_cons', description=''), 'cns_max_freq.fasta', 'fasta')
+    SeqIO.write(SeqRecord(
+        max_freq_cns, id=f'max_freq_cons_{sample_id}', description=''
+        ), f'cns_max_freq_{sample_id}.fasta', 'fasta')
     logging.info('translate max frequency sequence')
     frame_max, aa_framed_max = find_frame(max_freq_cns)
     assert frame_max == frame_ref
@@ -566,8 +571,8 @@ def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_fi
     # - in_pos is the position on the sample consensus,
     # - pos is the position on H77/consensus_B.
     # This will be useful also later to report minority variants on H77/consensus_B
-    max_freq_muts_aa = compute_org_mutations(aa_framed_max, org_found=organism)
-    max_freq_muts_aa.to_csv('max_freq_muts_aa.csv', index=False, float_format='%6.4f')
+    max_freq_muts_aa = compute_org_mutations(aa_framed_max, org_found=organism, sample_id=sample_id)
+    max_freq_muts_aa.to_csv(f'max_freq_muts_aa_{sample_id}.csv', index=False, float_format='%6.4f')
 
     logging.info('translate minority variants going over one codon at a time')
     ref_len = len(max_freq_cns)
@@ -581,7 +586,7 @@ def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_fi
     #nt_freq_save = []
     for c in codon_positions:
         codon_muts = merged[merged.pos.isin(c)]  # extracts just the affected positions
-        a_pos, aas, freqs, nts = nt_freq_2_aa_freq(codon_muts, frame_max, bam_file)
+        a_pos, aas, freqs, nts = nt_freq_2_aa_freq(codon_muts, frame_max, bam_file, sample_id)
         a_pos_save.extend(a_pos)
         aas_save.extend(aas)
         freqs_save.extend(freqs)
@@ -603,7 +608,7 @@ def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_fi
     #all_muts_nt['pos'] = all_muts_nt['pos'] - all_muts_nt['pos'][0] + 1
     delta = (all_muts_nt['pos'][0] - (3 * (ref_start_pos - 1) + 1))
     all_muts_nt['pos'] = all_muts_nt['pos'] - delta
-    all_muts_nt.to_csv('mutations_nt_pos_ref_aa.csv', index=False, float_format='%6.4f')
+    all_muts_nt.to_csv(f'mutations_nt_pos_ref_aa_{sample_id}.csv', index=False, float_format='%6.4f')
     
     assert (all_muts_nt['pos'] > 0).all() 
     if organism == 'HIV':
@@ -614,7 +619,7 @@ def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_fi
     all_muts_aa_full.drop(['mut_x', 'in_pos','nt_info'], axis=1, inplace=True)
     # all_muts_aa_full.drop(['mut_x'], axis=1, inplace=True)
     all_muts_aa_full.rename(columns={'mut_y': 'mut'}, inplace=True)
-    all_muts_aa_full.to_csv('intermediate.csv', index=False, float_format='%6.4f')
+    all_muts_aa_full.to_csv(f'intermediate_{sample_id}.csv', index=False, float_format='%6.4f')
     all_muts_aa_codon_full_csv = all_muts_aa_full.copy(deep=True)
     all_muts_aa_full = all_muts_aa_full.drop(['nts'], axis=1)
     # sum over synonymous mutations. Since deletions look like synonymous mutations, 
@@ -627,14 +632,14 @@ def main(vcf_file='hq_2_cns_final_recal.vcf', ref_file='cns_final.fasta', bam_fi
     all_muts_aa_codon_full_csv['organism'] = organism
     all_muts_aa_full['gene'], all_muts_aa_full['gene_pos'] = zip(*all_muts_aa_full.apply(gene_name_pos, axis=1))
     all_muts_aa_codon_full_csv['gene'], all_muts_aa_codon_full_csv['gene_pos'] = zip(*all_muts_aa_codon_full_csv.apply(gene_name_pos, axis=1))
-    all_muts_aa_codon_full_csv.to_csv('all_muts_aa_codon_full.csv', index=False, float_format='%6.4f')
+    all_muts_aa_codon_full_csv.to_csv(f'all_muts_aa_codon_full_{sample_id}.csv', index=False, float_format='%6.4f')
     # keep only the real mutations
     real_muts = all_muts_aa_full[all_muts_aa_full.wt != all_muts_aa_full.mut]
     real_muts = real_muts.sort_values(by=['pos', 'freq'], ascending=[True, False])
     real_muts = real_muts.drop(['organism', 'pos'], axis=1)
     real_muts = real_muts[['gene', 'wt', 'gene_pos', 'mut', 'freq']]
     real_muts.rename(columns={'gene_pos': 'pos'}, inplace=True)
-    real_muts.to_csv('final.csv', index=False, float_format='%6.4f')
+    real_muts.to_csv(f'final_{sample_id}.csv', index=False, float_format='%6.4f')
 
 
 if __name__ == '__main__':

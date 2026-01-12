@@ -15,6 +15,7 @@ Why does this file exist, and why not put this in __main__?
   Also see (1) from http://click.pocoo.org/5/setuptools/#setuptools-integration
 """
 import argparse
+import glob
 import os
 import sys
 from importlib.metadata import version
@@ -29,8 +30,8 @@ __version__ = version('minvar')
 
 files_to_remove = [
     'calls_1.vcf.gz', 'cnsref.amb', 'cnsref.ann', 'cnsref.bwt', 'hq_smp.fastq',
-    'hq_smp.fasta', 'hq_2_cns_final.bam', 'hq_2_cns_final.bam.bai',
-    'cnsref.pac', 'cnsref.sa', 'high_quality.fastq', 'loc_res.tsv',
+    'hq_smp.fasta', 'hq_2_cns_final.bam', 'hq_2_cns_final.bam.bai', 'hq_2_cns_before_trim.bam',
+    'hq_2_cns_before_trim.bam.bai', 'cnsref.pac', 'cnsref.sa', 'high_quality.fastq', 'loc_res.tsv',
     'outblast.xml', 'refcon_sorted.bam', 'refcon_sorted.bam.bai',
     'sample_hq.fasta', 'phased.csv']
 
@@ -58,22 +59,26 @@ def main(args=None):
     import logging.handlers
 
     args = parser.parse_args(args=args)
+    sample_id = os.path.basename(args.f).split('_')[0]
 
     log_format = '%(levelname)s %(asctime)s %(filename)s: %(funcName)s() %(lineno)d: \t%(message)s'
-    logging.basicConfig(filename='minvar.log', level=logging.INFO, format=log_format, datefmt='%Y/%m/%d %H:%M:%S')
+    logging.basicConfig(filename=f'minvar_{sample_id}.log', level=logging.INFO, format=log_format, datefmt='%Y/%m/%d %H:%M:%S')
     logging.info(' '.join(sys.argv))
 
-    
-    cns_file, prepared_bam, org_found = prepare.main(args.f)
+    cns_file, prepared_bam, org_found = prepare.main(args.f, sample_id=sample_id)
 
     called_file, called_bam = callvar.main(ref_file=cns_file, bamfile=prepared_bam, caller='lofreq',
-                                           recalibrate=args.recal)
+                                           recalibrate=args.recal, sample_id=sample_id)
 
-    annotate.main(vcf_file=called_file, ref_file=cns_file, bam_file=called_bam, organism=org_found)
+    annotate.main(vcf_file=called_file, ref_file=cns_file, bam_file=called_bam, organism=org_found, sample_id=sample_id)
 
-    reportdrm.main(org=org_found, subtype_file='subtype_evidence.csv', fastq=args.f, version=__version__)
+    reportdrm.main(org=org_found, subtype_file=f'subtype_evidence_{sample_id}.csv', fastq=args.f, version=__version__, sample_id=sample_id)
 
     if not args.keep:
+        for i in range(1, 11):
+              files_to_remove.append(f'cns_{i}.fasta')
+              files_to_remove.append(f'cns_{i}.fasta.fai')
+              files_to_remove.append(f'calls_{i}.vcf.gz')
         for f in files_to_remove:
             try:
                 os.remove(f)
