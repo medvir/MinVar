@@ -66,16 +66,18 @@ for i in range(2421, 3012):
 
 # dictionary with 1-based coordinates of genes on consensus_B
 consensus_B_map = {}
-for i in range(1, 57):
-    consensus_B_map[i] = 'GagPolTF', i
-for i in range(57, 156):
-    consensus_B_map[i] = 'protease', i - 56
-for i in range(156, 596):
-    consensus_B_map[i] = 'RT', i - 155
-for i in range(596, 716):
-    consensus_B_map[i] = 'RNase', i - 595
-for i in range(716, 1004):
-    consensus_B_map[i] = 'integrase', i - 715
+for i in range(1, 232):
+    consensus_B_map[i] = 'capsid', i
+for i in range(232, 288):
+    consensus_B_map[i] = 'GagPolTF', i - 231
+for i in range(288, 387):
+    consensus_B_map[i] = 'protease', i - 287
+for i in range(387, 827):
+    consensus_B_map[i] = 'RT', i - 386
+for i in range(827, 947):
+    consensus_B_map[i] = 'RNase', i - 826
+for i in range(947, 1235):
+    consensus_B_map[i] = 'integrase', i - 946
 
 # map names in consensus file to subtypes
 hiv_map = {

@@ -74,9 +74,9 @@ cell_colour = {
 def parse_drm():
     """Return drug resistance mutations listed in files db/HIV/masterComments*.txt."""
     df_list = []
-    genes = ['protease', 'RT', 'integrase']
+    genes = ['protease', 'RT', 'integrase', 'capsid']
     HIVdb_comment_files = [resources.files(__name__).joinpath('db/HIV/masterComments_%s.txt' % p)
-                           for p in ('PI', 'RTI', 'INI')]
+                           for p in ('PI', 'RTI', 'INI', 'CA')]
     for gene, drm_file in zip(genes, HIVdb_comment_files):
         d1 = pd.read_table(drm_file, header=0, names=['pos', 'mut', 'category', 'comment'])
         gs = pd.Series([gene] * len(d1))
@@ -147,8 +147,8 @@ def write_sierra_results(handle, mut_file):
     mutations = mutations[mutations['gene'] != 'GagPolTF']
     mutations = mutations[mutations['gene'] != 'RNase']
     mutations = mutations[mutations['wt'] != '*']
-    gmap = {'protease': 'PR', 'RT': 'RT', 'integrase': 'IN'}
-    gmap_inverse = {'PR': 'protease', 'IN': 'integrase'}
+    gmap = {'protease': 'PR', 'RT': 'RT', 'integrase': 'IN', 'capsid': 'CA'}
+    gmap_inverse = {'PR': 'protease', 'IN': 'integrase', 'CA': 'capsid'}
     mutations['pattern'] = mutations.apply(
         lambda m: '%s:%s%d%s' % (gmap[m['gene']], m['wt'], m['pos'], m['mut']), axis=1)
     ptn = ' + '.join(mutations['pattern'])
@@ -220,7 +220,7 @@ def calc_APD(alignment, sample_id='ID'):
     APD_ambi_cons_df = pd.DataFrame({ 'cons_B': list(APD_cons_al), 'amb':list(APD_ambi_al)})
     pos_consB = []
     pos_amb = []
-    i_consB = 167 
+    i_consB = 0
     i_amb = 0 
     for index, row in APD_ambi_cons_df.iterrows():
         if row['cons_B'] != '-':
@@ -239,8 +239,8 @@ def calc_APD(alignment, sample_id='ID'):
     APD_ambi_cons_freq_df = pd.merge(APD_ambi_cons_df, mutations_nt_pos_ref_df, left_on = 'pos_amb', right_on='pos', how='inner')
     APD_ambi_cons_freq_df.to_csv(f'APD_ambi_cons_freq_{sample_id}.csv')
     
-    #keep only based on pos_consB 168:1470 
-    APD_ambi_cons_freq_df = APD_ambi_cons_freq_df[(168 <= APD_ambi_cons_freq_df['pos_consB']) & ( APD_ambi_cons_freq_df['pos_consB'] < 1470)]
+    #keep only based on pos_consB 861:2163 
+    APD_ambi_cons_freq_df = APD_ambi_cons_freq_df[(862 <= APD_ambi_cons_freq_df['pos_consB']) & ( APD_ambi_cons_freq_df['pos_consB'] <= 2163)]
     # remove starting and ending '-' in consB
     start_pos = 1
     APD_ambi_cons_freq_3rdcodon_df = APD_ambi_cons_freq_df[((APD_ambi_cons_freq_df['pos_consB'] - (start_pos + 2))%3) == 0]
@@ -295,44 +295,42 @@ def write_ambig_score(handle, sample_id='ID'):
     """
     print('\nAmbiguity score', file=handle)
     print('---------------\n', file=handle)
-    amb_target = str(list(SeqIO.parse(cons_B_file, 'fasta'))[0].seq[168:1470])
-    needle_align(f'cns_ambiguous_{sample_id}.fasta', 'asis:%s'% amb_target, f'ambi_aln_{sample_id}.fasta', go=10., ge=.5)
+
+    # 1. Use the FULL reference to anchor the global alignment perfectly
+    full_ref = str(list(SeqIO.parse(cons_B_file, 'fasta'))[0].seq)
+    needle_align(f'cns_ambiguous_{sample_id}.fasta', 'asis:%s'% full_ref, f'ambi_aln_{sample_id}.fasta', go=10., ge=.5)
     alignment = AlignIO.read(f'ambi_aln_{sample_id}.fasta', 'fasta')
 
-    start = None
-    i = 0
-    while start is None:
-        if '-' not in alignment[:, i]:
-            start = i
-        i += 1
     ambi_al, cons_al = str(alignment[0].seq), str(alignment[1].seq)
-    stop = min(len(cons_al.rstrip('-')), len(ambi_al.rstrip('-')))
-    target = ambi_al[start:stop].replace('-', '').replace('N', '')
+
+    # 2. Safely extract the exact PR+RT window from the alignment
+    ref_pos = 0
+    start_idx = 0
+    stop_idx = len(cons_al)
+    
+    for idx, char in enumerate(cons_al):
+        if char != '-':
+            if ref_pos == 861:
+                start_idx = idx
+            elif ref_pos == 2163:
+                stop_idx = idx
+                break
+            ref_pos += 1
+
+    target = ambi_al[start_idx:stop_idx].replace('-', '').replace('N', '')
     rlen = len(target)
     score = float(sum((1 for nt in target if nt not in set(['A', 'C', 'G', 'T']))))
     print('Score: %4.2f %% (%d of %d total nucleotides).\n\n' % (100 * score / rlen, score, rlen), file=handle)
     print('Region to compute ambiguity score is 1302 bp, reached high coverage on %d.\n\n' % rlen, file=handle)
-    #APD_alignment = AlignIO.read('ambi_aln.fasta', 'fasta')
     
     APD_score, APD_len, APD_pos = calc_APD(alignment, sample_id=sample_id)
-    #assert APD_len == rlen, 'APD length is %d different from %d' % (APD_len, rlen)
+
     print('\nAverage pairwise diversity (APD) score', file=handle)
     print('---------------\n', file=handle)
-    print('APD Score: %4.6f (%d of %d total 3rd codon position nucleotides).\n\n' % (APD_score / APD_len, APD_pos, APD_len), file=handle)
-
-# def write_header_HIV(handle, drms=None):
-#     """Write header to a file in markdown format."""
-#     md_header = """\
-# Parsing mutations
-# -----------------
-#
-# The list of annotated mutations was downloaded from HIVdb and includes:
-#
-# """
-#     for gene in ['protease', 'RT', 'integrase']:
-#         positions = set(drms[drms.gene == gene].pos.tolist())
-#         md_header += '- %d positions on %s\n' % (len(positions), gene)
-#     print(md_header, file=handle)
+    if APD_len > 0:
+        print('APD Score: %4.6f (%d of %d total 3rd codon position nucleotides).\n\n' % (APD_score / APD_len, APD_pos, APD_len), file=handle)
+    else:
+        print('APD Score: N/A (0 total 3rd codon position nucleotides).\n\n', file=handle)
 
 
 def write_header_HCV(handle, drms=None):
@@ -382,7 +380,7 @@ def parse_merged(mer_file):
     categories = []
     comments = []
     # iterate on annotations grouped by gene/pos
-    for name, group in annotated.groupby(['gene', 'pos']):
+    for name, group in annotated.groupby(['gene', 'pos', 'mut_x']):
         aas = group[pd.notna(group['mut_x'])]['mut_x'].tolist()
         if not aas:  # mutation not detected at this position
             continue
@@ -543,7 +541,7 @@ No HIV/HCV read found
         print('Mutation lists from %s.\n' % mastercomments_version, file=rh)
         write_run_info(rh)
         # write_header_HIV(rh, resistance_mutations)
-        for gene in ['protease', 'RT', 'integrase']:
+        for gene in ['protease', 'RT', 'integrase', 'capsid']:
             gene_muts = drms[drms.gene == gene]
             if gene_muts.shape[0] == 0:
                 logging.info('No mutations on %s', gene)
