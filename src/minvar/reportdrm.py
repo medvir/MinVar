@@ -549,7 +549,28 @@ No HIV/HCV read found
                 print('-' * (len(gene) + 16), file=rh)
                 print(file=rh)
                 continue
-            # sort was lost because
+            
+            filtered_dfs = []
+            for pos, group in gene_muts.groupby('pos'):
+                # 1. Keep all annotated variants
+                keep_annotated = group[group['category'] != 'unannotated']
+                
+                # 2. Keep all unannotated stop codons (*)
+                keep_stop = group[(group['category'] == 'unannotated') & (group['mut'] == '*')]
+                
+                # 3. For the rest of the unannotated variants, keep only the most frequent one
+                unannotated = group[(group['category'] == 'unannotated') & (group['mut'] != '*')]
+                if not unannotated.empty:
+                    keep_unannotated = unannotated.nlargest(1, 'freq')
+                else:
+                    keep_unannotated = pd.DataFrame()
+                
+                # Combine the kept rows back together for this position
+                filtered_dfs.append(pd.concat([keep_annotated, keep_stop, keep_unannotated]))
+                
+            if filtered_dfs:
+                gene_muts = pd.concat(filtered_dfs)
+
             gene_muts = gene_muts.sort_values(
                 by=['gene', 'pos', 'freq'], ascending=[True, True, False])
             print('%s' % gene, file=rh)
