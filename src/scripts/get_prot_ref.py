@@ -14,7 +14,9 @@ from Bio import SeqIO, AlignIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+parent_dir = os.path.join(src_dir, 'minvar')
+
 # manipulate path to import functions
 if __name__ == '__main__':
     if __package__ is None:
@@ -47,8 +49,8 @@ def extract_protein(polyprotein_file, prot):
     and returns the corresponding translated region by aligning against the
     protein from H77 isolate
     """
-    cml2 = 'needle -asequence %s_h77.faa -bsequence %s' % (prot,
-                                                           polyprotein_file)
+    h77_prot_file = os.path.join(parent_dir, 'db/HCV/%s_h77.faa' % prot)
+    cml2 = 'needle -asequence %s -bsequence %s' % (h77_prot_file, polyprotein_file)
     cml2 += ' -aformat3 fasta -auto -outfile aln.fasta'
     subprocess.call(shlex.split(cml2))
     aln = AlignIO.read('aln.fasta', 'fasta')

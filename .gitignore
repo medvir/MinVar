@@ -15,3 +15,4 @@ minvarenv/
 .vscode/
 docs/_site/
 .venv/
+src/minvar/db/HCV/*.faa

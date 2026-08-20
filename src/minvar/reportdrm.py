@@ -600,13 +600,18 @@ No HIV/HCV read found
         write_run_info(rh)
         drms = pd.read_csv(f'merged_muts_drm_annotated_{sample_id}.csv')
         drms = drms.fillna("unknown")
-        drms = drms[drms['CATEGORY'] == 'RAS']
-        # logging.info('Shape of annotated_mutations is: %s', str(mutation_detected.shape))
 
         if drms.shape[0] == 0:
             print('No mutations found', file=rh)
             print('-' * 26, file=rh)
             print('\n', file=rh)
+        
+        def is_true_ras(row):
+            # Check if it is a RAS position AND if the specific letter is dangerous
+            if row['CATEGORY'] == 'RAS' and str(row['dangerous_muts']) != 'unknown':
+                valid_muts = str(row['dangerous_muts']).split('/')
+                return row['mut'] in valid_muts
+            return False
 
         for gene in ['NS3', 'NS5A', 'NS5B']:
             gene_muts = drms[drms.gene == gene]
@@ -616,6 +621,29 @@ No HIV/HCV read found
                 print('-' * (len(gene) + 16), file=rh)
                 print(file=rh)
                 continue
+            
+            # Show several variants per position
+            filtered_dfs = []
+            for pos, group in gene_muts.groupby('pos'):
+
+                # Check if each mutation is a true RAS and dangerousmutation
+                true_ras_mask = group.apply(is_true_ras, axis=1)
+
+                # Keep all annotated variants (RAS)
+                keep_annotated = group[true_ras_mask].copy()
+                
+                # 2. Keep all unannotated stop codons (*)
+                keep_stop = group[(~true_ras_mask) & (group['mut'] == '*')].copy()
+                
+                # Combine the kept rows back together for this position
+                filtered_dfs.append(pd.concat([keep_annotated, keep_stop]))
+                
+            if filtered_dfs:
+                gene_muts = pd.concat(filtered_dfs)
+
+            # Re-apply sorting after the groupby
+            gene_muts = gene_muts.sort_values(
+                by=['pos', 'freq'], ascending=[True, False])
 
             print('%s' % gene, file=rh)
             print('-'*len(gene), file=rh)
