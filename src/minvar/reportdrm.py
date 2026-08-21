@@ -49,7 +49,7 @@ runpars.read(os.path.expanduser('~/.minvar/runpars.ini'))
 try:
     sierra_threshold = float(runpars['sierra']['threshold'])
 except KeyError:
-    sierra_threshold = 0.2
+    sierra_threshold = 0.15
 
 # colour cells according to susceptibility
 cell_colour = {
