@@ -20,6 +20,7 @@ import shlex
 import shutil
 import subprocess
 from importlib import resources
+from operator import itemgetter
 
 from Bio import SeqIO, AlignIO
 
@@ -606,10 +607,29 @@ No HIV/HCV read found
             print('-' * 26, file=rh)
             print('\n', file=rh)
         
+        patient_gt_col = None
+        try:
+            save_freq = {}
+            with open(subtype_file) as csvfile:
+                spamreader = csv.reader(csvfile, delimiter=',')
+                for mtype, freq in spamreader:
+                    int_freq = int(round(100 * float(freq), 0))
+                    if int_freq >= 1:
+                        save_freq[mtype] = save_freq.get(mtype, 0) + int_freq
+            top_gt, support = sorted(save_freq.items(), key=itemgetter(1), reverse=True)[0]
+            
+            # Map the subtype to the correct table column
+            if top_gt in ['1a', '1b']:
+                patient_gt_col = top_gt
+            else:
+                patient_gt_col = top_gt[0] # Takes '4r' -> '4', '3a' -> '3'
+        except Exception as e:
+            logging.warning(f"Could not determine patient genotype column: {e}")
+        
         def is_true_ras(row):
             # Check if it is a RAS position AND if the specific letter is dangerous
-            if row['CATEGORY'] == 'RAS' and str(row['dangerous_muts']) != 'unknown':
-                valid_muts = str(row['dangerous_muts']).split('/')
+            if row['CATEGORY'] == 'RAS' and patient_gt_col:
+                valid_muts = str(row[patient_gt_col]).split('/')
                 return row['mut'] in valid_muts
             return False
 

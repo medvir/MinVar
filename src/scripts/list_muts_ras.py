@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Use this on RAS tables to have a list of all gene/positions listed."""
+"""Parse RAS tables to extract specific dangerous mutations per genotype."""
 import glob
 import re
 import pandas as pd
@@ -7,40 +7,36 @@ import pandas as pd
 df_list = []
 for f in glob.glob('NS*csv'):
     gene_name = f.split('_')[0]
-    pos_muts = {}
     
     with open(f) as csvfile:
         muts = pd.read_csv(csvfile, delimiter=',')
         
+        processed_rows = []
         for index, row in muts.iterrows():
             pos = int(row['aa_position'])
-            dangerous_aas = set()
+            new_row = {'gene': gene_name, 'pos': pos}
             
-            # Iterate through all genotype columns (skip the first column 'aa_position')
+            # Keep the specific letters for each genotype column
             for col in muts.columns[1:]:
                 val = str(row[col])
-                # If the cell is not empty
+                dangerous_aas = set()
+                
                 if pd.notna(val) and val.strip() != '' and val != 'nan':
-                    # Regex: find the position number and capture the letters after it
-                    # Example: from "L/F28M/V/S" it matches "28" and captures "M/V/S"
                     match = re.search(r'\d+([A-Z/]+)', val)
                     if match:
                         letters = match.group(1).split('/')
                         dangerous_aas.update(letters)
+                
+                if dangerous_aas:
+                    new_row[col] = '/'.join(sorted(dangerous_aas))
+                else:
+                    new_row[col] = 'unknown'
+                    
+            processed_rows.append(new_row)
             
-            if dangerous_aas:
-                # Save as a slash-separated string like "C/D/E/G/H"
-                pos_muts[pos] = '/'.join(sorted(dangerous_aas))
-
-    df = pd.DataFrame({
-        'pos': list(pos_muts.keys()),
-        'dangerous_muts': list(pos_muts.values()),
-        'gene': gene_name
-    })
+    df = pd.DataFrame(processed_rows)
     df_list.append(df)
 
 mut_df = pd.concat(df_list)
 mut_df = mut_df.sort_values(by=['gene', 'pos'])
-# Ensure columns are in the correct order
-mut_df = mut_df[['gene', 'pos', 'dangerous_muts']]
 mut_df.to_csv('all_mutations_position.csv', index=False)
