@@ -696,6 +696,14 @@ def convert_2_pdf(sample_id='', version='unknown'):
     shutil.copy(tmpl_file, os.getcwd())
     # write contact.tex to be included in template
     write_contact_file(sample_id=sample_id, version=version)
+
+    # Replace '≥' with '>='
+    md_filename = f'report_{sample_id}.md'
+    with open(md_filename, 'r', encoding='utf-8') as f:
+        md_content = f.read()
+    with open(md_filename, 'w', encoding='utf-8') as f:
+        f.write(md_content.replace('≥', '>='))
+
     logging.info('Converting markdown to pdf with pandoc')
     pand_cml = f'pandoc --template=./template.tex report_{sample_id}.md -o report_{sample_id}.pdf'
     logging.debug(pand_cml)
