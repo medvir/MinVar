@@ -32,16 +32,13 @@ if __name__ == '__main__':
         os.sys.path.insert(1, dn_dir)
         mod = __import__('minvar')
         sys.modules["minvar"] = mod
-        from common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, mastercomments_version, wobbles, APD_THRESHOLD
+        from common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, wobbles, APD_THRESHOLD
         from Alignment import needle_align
 else:
-    from .common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, mastercomments_version, wobbles, APD_THRESHOLD
+    from .common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, wobbles, APD_THRESHOLD
     from .Alignment import needle_align
 
 cons_B_file = resources.files('minvar').joinpath('db/HIV/consensus_B.fna')
-
-# aminoacid one-letter code
-aa_set = set('GPAVLIMCFYWHKRQNEDST')
 
 # mutations below this threshold do not contribute to drug prediction via HIVdb
 runpars = configparser.ConfigParser()
@@ -71,21 +68,6 @@ cell_colour = {
 # RT = list(SeqIO.parse(os.path.join(db_dir, 'RT.faa'), 'fasta'))[0]
 # integrase = \
 #     list(SeqIO.parse(os.path.join(db_dir, 'integrase.faa'), 'fasta'))[0]
-
-def parse_drm():
-    """Return drug resistance mutations listed in files db/HIV/masterComments*.txt."""
-    df_list = []
-    genes = ['protease', 'RT', 'integrase', 'capsid']
-    HIVdb_comment_files = [resources.files(__name__).joinpath('db/HIV/masterComments_%s.txt' % p)
-                           for p in ('PI', 'RTI', 'INI', 'CA')]
-    for gene, drm_file in zip(genes, HIVdb_comment_files):
-        d1 = pd.read_table(drm_file, header=0, names=['pos', 'mut', 'category', 'comment'])
-        gs = pd.Series([gene] * len(d1))
-        d1['gene'] = gs
-        df_list.append(d1)
-    df = pd.concat(df_list)
-    return df
-
 
 def parse_ras():
     """Return position of RAS listed in file db/HCV/all_mutations_position.csv."""
@@ -124,6 +106,80 @@ def write_subtype_info(handle, subtype_file=None):
     except FileNotFoundError:
         md_header = '\n'
     print(md_header, file=handle)
+
+
+def annotate_hiv_sierra(mutation_detected, sample_id='ID'):
+    """Annotate detected HIV mutations (e.g., at 1.5% threshold) live via Sierra (sierrapy).
+
+    Queries ``sierrapy patterns`` for each detected mutation in protease, RT, integrase, and capsid,
+    extracting its HIVdb mutation category, comment, and the live Stanford HIVdb version and publishDate.
+    """
+    import json
+
+    gmap = {'protease': 'PR', 'RT': 'RT', 'integrase': 'IN', 'capsid': 'CA'}
+    patterns = []
+    query_indices = []
+    for idx, row in mutation_detected.iterrows():
+        gene = row['gene']
+        wt = str(row['wt'])
+        pos = int(row['pos'])
+        mut = str(row['mut'])
+        if gene in gmap and wt != '*' and mut != '*':
+            patterns.append(f'{gmap[gene]}:{wt}{pos}{mut}')
+            query_indices.append(idx)
+
+    ptn_file = f'pattern_all_{sample_id}.txt'
+    gql_file = f'query_all_{sample_id}.gql'
+    out_file = f'o_all_{sample_id}.json'
+
+    with open(ptn_file, 'w') as h:
+        if patterns:
+            h.write('\n'.join(patterns) + '\n')
+        else:
+            h.write('PR:L10I\n')
+
+    with open(gql_file, 'w') as h:
+        h.write(
+            'drugResistance(includeGenes: [PR, RT, IN, CA]) {\n'
+            '  version { text, publishDate }\n'
+            '}\n'
+            'allGeneMutations(includeGenes: [PR, RT, IN, CA]) {\n'
+            '  gene { name }\n'
+            '  mutations {\n'
+            '    position\n'
+            '    AAs\n'
+            '    comments { name type text }\n'
+            '  }\n'
+            '}\n'
+        )
+
+    cml = shlex.split(f'sierrapy patterns {ptn_file} -q {gql_file} --no-sharding -o {out_file}')
+    logging.debug(cml)
+    subprocess.call(cml)
+    with open(out_file) as h:
+        sierra_res = json.load(h)
+    os.remove(out_file)
+    os.remove(ptn_file)
+    os.remove(gql_file)
+
+    version = sierra_res[0]['drugResistance'][0]['version']['text']
+    pubdate = sierra_res[0]['drugResistance'][0]['version']['publishDate']
+
+    categories = ['unannotated'] * len(mutation_detected)
+    comments = ['unannoted'] * len(mutation_detected)
+    if patterns:
+        for idx, res in zip(query_indices, sierra_res):
+            agm = res.get('allGeneMutations', [])
+            coms = agm[0]['mutations'][0].get('comments', []) if (agm and agm[0].get('mutations')) else []
+            real_coms = [cm for cm in coms if 'unusual mutation at this position' not in cm.get('text', '')]
+            if real_coms:
+                categories[idx] = real_coms[0]['type']
+                comments[idx] = real_coms[0]['text']
+
+    mdf = mutation_detected.copy()
+    mdf['category'] = categories
+    mdf['comment'] = comments
+    return mdf, version, pubdate
 
 
 def write_sierra_results(handle, mut_file):
@@ -354,67 +410,6 @@ The list of known RAS includes:
     print(md_header, file=handle)
 
 
-def aa_unpack(mut_string):
-    """Helper function used to extract a set of amminoacids from the merged csv files."""
-    if not mut_string.startswith('NOT'):
-        return set(mut_string)
-    return aa_set - set(mut_string.split()[1])
-
-
-def parse_merged(mer_file):
-    """Manual conversion of mutations extracted from HIVdb comment files.
-
-    This has been adapted to work on HIVdb 8.4 files.
-
-    In older versions, comment files contained information with NOT XYZ to signify
-    all aminoacids except X, Y, and Z. This function translated this into a list of
-    valid ammino acids. It was too complicated to achieve this functionality with panda alone.
-    """
-    # read file with annotations, result of a merge detected with HIVdb annotations
-    annotated = pd.read_csv(mer_file)
-    # prepare output file
-    genes = []
-    positions = []
-    wts = []
-    muts = []
-    freqs = []
-    categories = []
-    comments = []
-    # iterate on annotations grouped by gene/pos
-    for name, group in annotated.groupby(['gene', 'pos', 'mut_x']):
-        aas = group[pd.notna(group['mut_x'])]['mut_x'].tolist()
-        if not aas:  # mutation not detected at this position
-            continue
-        mutation_found = False
-        # mut_x is detected, mut_y is annotation, iterate on detected to see if it is among the annotated ones
-        for idx, row in group.iterrows():
-            del idx
-            detected_mutation = row['mut_x']
-            if detected_mutation in str(row['mut_y']):
-                mutation_found = True
-                genes.append(name[0])
-                positions.append(name[1])
-                wts.append(row['wt'])
-                freqs.append(row['freq'])
-                muts.append(row['mut_x'])
-                categories.append(row['category'])
-                comments.append(row['comment'])
-                break
-        if not mutation_found:
-            genes.append(name[0])
-            positions.append(name[1])
-            wts.append(row['wt'])
-            freqs.append(row['freq'])
-            muts.append(row['mut_x'])
-            categories.append('unannotated')
-            comments.append('unannoted')
-
-    mdf = pd.DataFrame({'gene': genes, 'pos': positions, 'wt': wts, 'mut': muts, 'freq': freqs,
-                        'category': categories, 'comment': comments})
-
-    return mdf
-
-
 def write_contact_file(sample_id='unknown sample', version='unknown'):
     """Write tex file with contact information taken from ini file and sample_id in footer.
 
@@ -500,7 +495,6 @@ def write_md(org=None, mut_file='final.csv', subtype_file='subtype_evidence.csv'
     write_subtype_info(rh, subtype_file)
 
     if org == 'HIV':
-        resistance_mutations = parse_drm()
         write_sierra_results(rh, mut_file)
     elif org == 'HCV':
         resistance_mutations = parse_ras()
@@ -516,22 +510,13 @@ No HIV/HCV read found
     logging.info('Reading mutations from %s', mut_file)
     mutation_detected = pd.read_csv(mut_file)
     logging.info('shape: %s', mutation_detected.shape)
-    logging.info('Parsed DRM from database, shape: %s', str(resistance_mutations.shape))
-    mpd = pd.merge(mutation_detected, resistance_mutations, how='left',
-                   on=['gene', 'pos'])
-    mpd.to_csv(path_or_buf=f'merged_muts_drm_annotated_{sample_id}.csv', index=False)
-    logging.info('Shape of raw merged is: %s', str(mpd.shape))
 
     print('\nMutations detected', file=rh)
     print('==================\n', file=rh)
     if org == 'HIV':
-        # too complicated with panda, do it by hand
-        drms = parse_merged(f'merged_muts_drm_annotated_{sample_id}.csv')
+        drms, version, pubdate = annotate_hiv_sierra(mutation_detected, sample_id=sample_id)
+        drms.to_csv(path_or_buf=f'merged_muts_drm_annotated_{sample_id}.csv', index=False)
         logging.info('Shape of elaborated merged is: %s', str(drms.shape))
-        # os.remove('merged_muts.csv')
-
-        # drms.drop(['commented', 'mut_y'], axis=1, inplace=True)
-        drms.rename(columns={'mut_x': 'mut'}, inplace=True)
 
         cols = ['gene', 'pos', 'mut', 'freq', 'category']
         drms = drms[cols]
@@ -539,7 +524,7 @@ No HIV/HCV read found
                          ascending=[True, True, False])
         drms.to_csv(f'annotated_DRM_{sample_id}.csv', index=False)
 
-        print('Mutation lists from %s.\n' % mastercomments_version, file=rh)
+        print('Mutation lists from Stanford HIVdb version %s, pubdate %s.\n' % (version, pubdate), file=rh)
         write_run_info(rh)
         # write_header_HIV(rh, resistance_mutations)
         for gene in ['protease', 'RT', 'integrase', 'capsid']:
@@ -597,6 +582,11 @@ No HIV/HCV read found
             print('\n', file=rh)
         write_ambig_score(rh, sample_id=sample_id)
     elif org == 'HCV':
+        logging.info('Parsed DRM from database, shape: %s', str(resistance_mutations.shape))
+        mpd = pd.merge(mutation_detected, resistance_mutations, how='left',
+                       on=['gene', 'pos'])
+        mpd.to_csv(path_or_buf=f'merged_muts_drm_annotated_{sample_id}.csv', index=False)
+        logging.info('Shape of raw merged is: %s', str(mpd.shape))
         write_header_HCV(rh, resistance_mutations)
         write_run_info(rh)
         drms = pd.read_csv(f'merged_muts_drm_annotated_{sample_id}.csv')
@@ -728,6 +718,4 @@ def main(org=None, subtype_file=None, fastq='unknown', version='unknown', sample
 
 if __name__ == '__main__':
     # write_sierra_results(sys.stdout, 'final.csv')
-    #x = parse_merged('merged_muts_drm_annotated.csv')
-    #x.to_csv('x.csv')
     main(org=sys.argv[1], subtype_file='subtype_evidence.csv')

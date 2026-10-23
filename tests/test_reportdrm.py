@@ -1,29 +1,30 @@
 #!/usr/bin/env python3
 """Simple test facility"""
-import os
+import pandas as pd
 import pytest
 
-from src.minvar.reportdrm import parse_merged
+from src.minvar.reportdrm import annotate_hiv_sierra
 
 
-test_mer = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'small_merged_muts.csv')
-assert os.path.exists(test_mer)
-
-
-def test_parse_merged():
-    out = parse_merged(test_mer)
+def test_annotate_hiv_sierra():
+    df = pd.DataFrame([
+        {'gene': 'GagPolTF', 'wt': 'D', 'pos': 5, 'mut': 'N', 'freq': 1.0},
+        {'gene': 'protease', 'wt': 'L', 'pos': 10, 'mut': 'I', 'freq': 0.0809},
+        {'gene': 'protease', 'wt': 'K', 'pos': 20, 'mut': 'R', 'freq': 0.983},
+        {'gene': 'protease', 'wt': 'L', 'pos': 89, 'mut': 'M', 'freq': 1.0},
+        {'gene': 'RT', 'wt': 'D', 'pos': 123, 'mut': '*', 'freq': 0.0179},
+        {'gene': 'RT', 'wt': 'V', 'pos': 179, 'mut': 'I', 'freq': 1.0},
+        {'gene': 'RT', 'wt': 'D', 'pos': 192, 'mut': 'N', 'freq': 0.0153},
+        {'gene': 'capsid', 'wt': 'M', 'pos': 66, 'mut': 'I', 'freq': 0.25},
+    ])
+    out, version, pubdate = annotate_hiv_sierra(df, sample_id='test')
     assert len(out) == 8, out
-
-    # assert out_0['wt'] == 'T', out
-    # assert out_0['pos'] == 4, out
-    # assert out_0['mut'] == 'A', out
-    # assert out_1['wt'] == 'G', out
-    # assert out_1['pos'] == 11, out
-    # assert out_1['mut'] == 'C', out
-    # assert out.iloc[2]['wt'] == 'G', out
-    # assert out.iloc[2]['mut'] == 'CAAA', out
-    # assert out.iloc[3]['wt'] == 'TAGG', out
-    # assert out.iloc[3]['mut'] == 'C', out
+    assert version
+    assert pubdate
+    assert list(out['category']) == [
+        'unannotated', 'Other', 'Other', 'unannotated',
+        'unannotated', 'Other', 'unannotated', 'Major'
+    ]
 
 
 @pytest.mark.skip(reason='Still an empty box')

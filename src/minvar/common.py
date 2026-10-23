@@ -12,9 +12,6 @@ coverage_threshold = 100
 AMBIGUITY_THRESHOLD = 0.15
 APD_THRESHOLD = 0.01
 
-# This must be updated when new masterComments files are downloaded into src/minvar/db/HIV
-mastercomments_version = 'HIVdb version 8.4 (last updated 2017-06-16)'
-
 # from Table 1 of 10.1002/hep.20819 and
 # from https://www.ncbi.nlm.nih.gov/projects/genotyping/view.cgi?db=3
 # acc number of confirmed HCV genotypes/subtypes
