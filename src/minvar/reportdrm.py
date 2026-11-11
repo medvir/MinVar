@@ -34,9 +34,11 @@ if __name__ == '__main__':
         sys.modules["minvar"] = mod
         from common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, wobbles, APD_THRESHOLD
         from Alignment import needle_align
+        from annotate import find_frame
 else:
     from .common import MIN_FRACTION, RAW_DEPTH_THRESHOLD, drug_names, wobbles, APD_THRESHOLD
     from .Alignment import needle_align
+    from .annotate import find_frame
 
 cons_B_file = resources.files('minvar').joinpath('db/HIV/consensus_B.fna')
 
@@ -390,6 +392,116 @@ def write_ambig_score(handle, sample_id='ID'):
         print('APD Score: N/A (0 total 3rd codon position nucleotides).\n\n', file=handle)
 
 
+def calc_APD_HCV(sample_id='ID', start_codon=503, end_codon=1004, third_codon_only=False):
+    """Calculate HCV average pairwise diversity (APD) over an H77 codon window.
+
+    Uses the H77 amino-acid alignment from ``max_freq_muts_aa_<sample_id>.csv`` to map
+    H77 polyprotein codons ``[start_codon, end_codon]`` to sample consensus nucleotide
+    positions in ``merged_mutations_nt_<sample_id>.csv`` and ``cns_ambiguous_<sample_id>.fasta``.
+    By default, includes all codon positions per Carlisle et al.
+    """
+    max_freq_seq = str(list(SeqIO.parse(f'cns_max_freq_{sample_id}.fasta', 'fasta'))[0].seq)
+    ambi_seq = str(list(SeqIO.parse(f'cns_ambiguous_{sample_id}.fasta', 'fasta'))[0].seq)
+    frame_max, _ = find_frame(max_freq_seq)
+
+    aa_map_df = pd.read_csv(f'max_freq_muts_aa_{sample_id}.csv')
+    sub_aa = aa_map_df[(aa_map_df['pos'] >= start_codon) & (aa_map_df['pos'] <= end_codon)]
+    if sub_aa.empty:
+        return 0.0, 0, 0
+
+    sample_codons = set()
+    for _, row in sub_aa.iterrows():
+        c_start = int(row['in_pos'])
+        c_len = len(str(row['mut']))
+        for c_idx in range(c_start, c_start + c_len):
+            sample_codons.add(c_idx)
+
+    offsets = [2] if third_codon_only else [0, 1, 2]
+    nt_positions = []
+    for c_idx in sorted(sample_codons):
+        base_pos = frame_max + 3 * (c_idx - 1)
+        for off in offsets:
+            p = base_pos + off
+            if 1 <= p <= len(ambi_seq):
+                nt_positions.append(p)
+
+    valid_positions = [p for p in nt_positions if ambi_seq[p - 1] not in ('-', 'N')]
+    rlen = len(valid_positions)
+
+    mutations_nt_df = pd.read_csv(f'merged_mutations_nt_{sample_id}.csv')
+    region_nt_df = mutations_nt_df[mutations_nt_df['pos'].isin(set(valid_positions))].copy()
+    region_nt_df['amb'] = region_nt_df['pos'].apply(lambda p: ambi_seq[int(p) - 1])
+    region_nt_df.to_csv(f'APD_HCV_{start_codon}_{end_codon}_freq_{sample_id}.csv', index=False)
+
+    pos_freqs = region_nt_df.groupby('pos')['freq'].apply(list).to_dict()
+
+    APD_score = 0.0
+    amb_pos_count = 0
+    for p in valid_positions:
+        freq_ls = list(pos_freqs.get(p, [1.0]))
+        rem = 1.0 - sum(freq_ls)
+        if rem > 1e-9:
+            freq_ls.append(rem)
+        freq_ls.sort(reverse=True)
+        max_minority_freq = freq_ls[1] if len(freq_ls) > 1 else 0.0
+        if max_minority_freq >= APD_THRESHOLD:
+            amb_pos_count += 1
+            diversity_contribution_sum = sum(nc_freq * (1.0 - nc_freq) for nc_freq in freq_ls)
+            APD_score += diversity_contribution_sum
+
+    return APD_score, rlen, amb_pos_count
+
+
+def write_ambig_score_HCV(handle, sample_id='ID'):
+    """Compute and write HCV APD and Time Since Infection (TSI) to handle.
+
+    Reports diversity and TSI estimates for both regions recommended by Carlisle et al. (2020):
+    1. ORF amino acid codons 503-1004 (1506 bp on H77): alpha = 0.42, beta = 353.70
+    2. Entirety of genes E2, p7, and NS2 (H77 codons 384-1026, 1929 bp): alpha = 0.39, beta = 320.38
+    """
+    regions = [
+        {
+            'label': 'ORF codons 503-1004',
+            'start_codon': 503,
+            'end_codon': 1004,
+            'expected_bp': 1506,
+            'alpha': 0.42,
+            'beta': 353.70,
+        },
+        {
+            'label': 'Genes E2, p7 and NS2 (codons 384-1026)',
+            'start_codon': 384,
+            'end_codon': 1026,
+            'expected_bp': 1929,
+            'alpha': 0.39,
+            'beta': 320.38,
+        },
+    ]
+
+    print('\nAverage pairwise diversity (APD) and Time Since Infection (TSI)', file=handle)
+    print('---------------------------------------------------------------\n', file=handle)
+    print('Calculated across all codon positions according to Carlisle et al. (2020) '
+          'using H77 reference coordinates:\n', file=handle)
+
+    for reg in regions:
+        apd_sum, rlen, apd_pos = calc_APD_HCV(
+            sample_id=sample_id,
+            start_codon=reg['start_codon'],
+            end_codon=reg['end_codon'],
+            third_codon_only=False,
+        )
+        print(f"**{reg['label']}** (H77 target length: {reg['expected_bp']} bp, "
+              f"high coverage on {rlen} bp):\n", file=handle)
+        if rlen > 0:
+            apd_val = apd_sum / rlen
+            tsi_years = reg['beta'] * apd_val + reg['alpha']
+            recency_str = 'recent (< 1 year)' if tsi_years < 1.0 else 'chronic (>= 1 year)'
+            print(f"- APD Score: {apd_val:4.6f} ({apd_pos} of {rlen} total nucleotides)", file=handle)
+            print(f"- Estimated Time Since Infection (TSI): {tsi_years:4.2f} years ({recency_str})\n", file=handle)
+        else:
+            print("- APD Score: N/A (0 high-coverage nucleotides in this region)\n", file=handle)
+
+
 def write_header_HCV(handle, drms=None):
     """Write header with the count of known RAS to a file in markdown format (HCV only).
 
@@ -671,6 +783,7 @@ No HIV/HCV read found
                     file=rh)
                 del index
             print('\n', file=rh)
+        write_ambig_score_HCV(rh, sample_id=sample_id)
     rh.close()
 
 
